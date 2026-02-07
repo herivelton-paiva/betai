@@ -8,6 +8,10 @@ env:
   AWS_REGION: us-east-1
   ECR_REPOSITORY: workspace/betai
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
   deploy:
     name: Deploy
@@ -27,7 +31,7 @@ jobs:
     - name: Build with Maven
       run: mvn clean package -DskipTests
 
-    - name: Configure AWS credentials
+    - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
