@@ -1,6 +1,9 @@
 package br.com.betai.service;
 
 import br.com.betai.domain.Fixture;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -9,8 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -31,14 +32,26 @@ public class DailyFixtureNotificationService {
     @Value("${telegram.chat.id}")
     private String chatId;
 
+    @Value("${notification.cron.nightly}")
+    private String nightlyCron;
+
+    @Value("${notification.cron.morning}")
+    private String morningCron;
+
     public DailyFixtureNotificationService(DynamoDBService dynamoDBService, RestTemplate restTemplate) {
         this.dynamoDBService = dynamoDBService;
         this.restTemplate = restTemplate;
         this.objectMapper = new ObjectMapper();
     }
 
-    @Scheduled(cron = "0 55 23 * * *")
-    @Scheduled(cron = "0 0 1 * * *")
+    @PostConstruct
+    public void init() {
+        log.info("DailyFixtureNotificationService inicializado. Nightly: {} | Morning: {} (Zone: America/Sao_Paulo)",
+                nightlyCron, morningCron);
+    }
+
+    @Scheduled(cron = "${notification.cron.nightly:0 55 23 * * *}", zone = "America/Sao_Paulo")
+    @Scheduled(cron = "${notification.cron.morning:0 */5 * * * *}", zone = "America/Sao_Paulo")
     public void sendDailyFixtures() {
         log.info("Iniciando tarefa agendada de notificação de partidas do dia...");
         LocalDate today = LocalDate.now();
@@ -130,7 +143,7 @@ public class DailyFixtureNotificationService {
         summary.append(String.format("📈 Acertos: %.1f%%\n", winRate));
         summary.append(String.format("📉 Falhas: %.1f%%\n", lossRate));
         summary.append(
-                String.format("💰 Saldo Total: %s R$ %.2f\n", totalProfit >= 0 ? "" : "-", Math.abs(totalProfit)));
+                String.format("💰 Saldo Total: %s R$ %.2f\n", totalProfit >= 0 ? "+" : "-", Math.abs(totalProfit)));
 
         if (messageBuilder.length() + summary.length() > 4000) {
             chunks.add(messageBuilder.toString());
@@ -187,7 +200,6 @@ public class DailyFixtureNotificationService {
             JsonNode root = objectMapper.readTree(fixture.getOdds());
             JsonNode bets = null;
 
-            // Handle different structures (bookmaker object or bookmakers array)
             if (root.has("bookmaker")) {
                 bets = root.path("bookmaker").path("bets");
             } else if (root.has("bookmakers") && root.get("bookmakers").isArray()) {
