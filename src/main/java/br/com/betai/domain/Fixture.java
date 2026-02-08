@@ -6,27 +6,34 @@ public class Fixture {
     private Long id;
     private LocalDateTime date;
     private String statusLong;
+    private String statusShort;
     private String leagueName;
     private String homeTeam;
     private String awayTeam;
     private Integer homeTeamGoals;
     private Integer awayTeamGoals;
     private String odds;
+    private String winningTeamName;
+    private String predictionComment;
 
     public Fixture() {
     }
 
-    public Fixture(Long id, LocalDateTime date, String statusLong, String leagueName, String homeTeam, String awayTeam,
-            Integer homeTeamGoals, Integer awayTeamGoals, String odds) {
+    public Fixture(Long id, LocalDateTime date, String statusLong, String statusShort, String leagueName,
+            String homeTeam, String awayTeam, Integer homeTeamGoals, Integer awayTeamGoals, String odds,
+            String winningTeamName, String predictionComment) {
         this.id = id;
         this.date = date;
         this.statusLong = statusLong;
+        this.statusShort = statusShort;
         this.leagueName = leagueName;
         this.homeTeam = homeTeam;
         this.awayTeam = awayTeam;
         this.homeTeamGoals = homeTeamGoals;
         this.awayTeamGoals = awayTeamGoals;
         this.odds = odds;
+        this.winningTeamName = winningTeamName;
+        this.predictionComment = predictionComment;
     }
 
     public static FixtureBuilder builder() {
@@ -55,6 +62,14 @@ public class Fixture {
 
     public void setStatusLong(String statusLong) {
         this.statusLong = statusLong;
+    }
+
+    public String getStatusShort() {
+        return statusShort;
+    }
+
+    public void setStatusShort(String statusShort) {
+        this.statusShort = statusShort;
     }
 
     public String getLeagueName() {
@@ -105,16 +120,35 @@ public class Fixture {
         this.odds = odds;
     }
 
+    public String getWinningTeamName() {
+        return winningTeamName;
+    }
+
+    public void setWinningTeamName(String winningTeamName) {
+        this.winningTeamName = winningTeamName;
+    }
+
+    public String getPredictionComment() {
+        return predictionComment;
+    }
+
+    public void setPredictionComment(String predictionComment) {
+        this.predictionComment = predictionComment;
+    }
+
     public static class FixtureBuilder {
         private Long id;
         private LocalDateTime date;
         private String statusLong;
+        private String statusShort;
         private String leagueName;
         private String homeTeam;
         private String awayTeam;
         private Integer homeTeamGoals;
         private Integer awayTeamGoals;
         private String odds;
+        private String winningTeamName;
+        private String predictionComment;
 
         FixtureBuilder() {
         }
@@ -131,6 +165,11 @@ public class Fixture {
 
         public FixtureBuilder statusLong(String statusLong) {
             this.statusLong = statusLong;
+            return this;
+        }
+
+        public FixtureBuilder statusShort(String statusShort) {
+            this.statusShort = statusShort;
             return this;
         }
 
@@ -164,9 +203,19 @@ public class Fixture {
             return this;
         }
 
+        public FixtureBuilder winningTeamName(String winningTeamName) {
+            this.winningTeamName = winningTeamName;
+            return this;
+        }
+
+        public FixtureBuilder predictionComment(String predictionComment) {
+            this.predictionComment = predictionComment;
+            return this;
+        }
+
         public Fixture build() {
-            return new Fixture(id, date, statusLong, leagueName, homeTeam, awayTeam, homeTeamGoals, awayTeamGoals,
-                    odds);
+            return new Fixture(id, date, statusLong, statusShort, leagueName, homeTeam, awayTeam, homeTeamGoals,
+                    awayTeamGoals, odds, winningTeamName, predictionComment);
         }
     }
 }

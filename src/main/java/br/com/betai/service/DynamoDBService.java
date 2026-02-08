@@ -133,12 +133,54 @@ public class DynamoDBService {
 
         // Status
         if (fixtureMap.containsKey("status")) {
-            builder.statusLong(fixtureMap.get("status").m().get("long").s());
+            Map<String, AttributeValue> status = fixtureMap.get("status").m();
+            if (status.containsKey("long")) {
+                builder.statusLong(status.get("long").s());
+            }
+            if (status.containsKey("short")) {
+                builder.statusShort(status.get("short").s());
+            }
+        }
+
+        // Goals / Score
+        if (fixtureMap.containsKey("goals")) {
+            Map<String, AttributeValue> goals = fixtureMap.get("goals").m();
+            if (goals.containsKey("home") && goals.get("home").n() != null) {
+                builder.homeTeamGoals(Integer.valueOf(goals.get("home").n()));
+            }
+            if (goals.containsKey("away") && goals.get("away").n() != null) {
+                builder.awayTeamGoals(Integer.valueOf(goals.get("away").n()));
+            }
+        } else if (fixtureMap.containsKey("score")) {
+            Map<String, AttributeValue> score = fixtureMap.get("score").m();
+            if (score.containsKey("home") && score.get("home").n() != null) {
+                builder.homeTeamGoals(Integer.valueOf(score.get("home").n()));
+            }
+            if (score.containsKey("away") && score.get("away").n() != null) {
+                builder.awayTeamGoals(Integer.valueOf(score.get("away").n()));
+            }
         }
 
         // Odds (can be a separate column in the main data map)
         if (data.containsKey("odds")) {
             builder.odds(convertAttributeValueToJson(data.get("odds")));
+        }
+
+        // Predictions
+        if (data.containsKey("predictions")) {
+            Map<String, AttributeValue> predictionsMap = data.get("predictions").m();
+            if (predictionsMap.containsKey("predictions")) {
+                Map<String, AttributeValue> innerPredictions = predictionsMap.get("predictions").m();
+                if (innerPredictions.containsKey("winner")) {
+                    Map<String, AttributeValue> winner = innerPredictions.get("winner").m();
+                    if (winner.containsKey("name")) {
+                        builder.winningTeamName(winner.get("name").s());
+                    }
+                    if (winner.containsKey("comment")) {
+                        builder.predictionComment(winner.get("comment").s());
+                    }
+                }
+            }
         }
 
         return builder.build();
