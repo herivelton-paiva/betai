@@ -9,7 +9,9 @@ public class Fixture {
     private String statusShort;
     private String leagueName;
     private String homeTeam;
+    private Long homeTeamId;
     private String awayTeam;
+    private Long awayTeamId;
     private Integer homeTeamGoals;
     private Integer awayTeamGoals;
     private String odds;
@@ -20,15 +22,17 @@ public class Fixture {
     }
 
     public Fixture(Long id, LocalDateTime date, String statusLong, String statusShort, String leagueName,
-            String homeTeam, String awayTeam, Integer homeTeamGoals, Integer awayTeamGoals, String odds,
-            String winningTeamName, String predictionComment) {
+            String homeTeam, Long homeTeamId, String awayTeam, Long awayTeamId, Integer homeTeamGoals,
+            Integer awayTeamGoals, String odds, String winningTeamName, String predictionComment) {
         this.id = id;
         this.date = date;
         this.statusLong = statusLong;
         this.statusShort = statusShort;
         this.leagueName = leagueName;
         this.homeTeam = homeTeam;
+        this.homeTeamId = homeTeamId;
         this.awayTeam = awayTeam;
+        this.awayTeamId = awayTeamId;
         this.homeTeamGoals = homeTeamGoals;
         this.awayTeamGoals = awayTeamGoals;
         this.odds = odds;
@@ -88,12 +92,28 @@ public class Fixture {
         this.homeTeam = homeTeam;
     }
 
+    public Long getHomeTeamId() {
+        return homeTeamId;
+    }
+
+    public void setHomeTeamId(Long homeTeamId) {
+        this.homeTeamId = homeTeamId;
+    }
+
     public String getAwayTeam() {
         return awayTeam;
     }
 
     public void setAwayTeam(String awayTeam) {
         this.awayTeam = awayTeam;
+    }
+
+    public Long getAwayTeamId() {
+        return awayTeamId;
+    }
+
+    public void setAwayTeamId(Long awayTeamId) {
+        this.awayTeamId = awayTeamId;
     }
 
     public Integer getHomeTeamGoals() {
@@ -143,7 +163,9 @@ public class Fixture {
         private String statusShort;
         private String leagueName;
         private String homeTeam;
+        private Long homeTeamId;
         private String awayTeam;
+        private Long awayTeamId;
         private Integer homeTeamGoals;
         private Integer awayTeamGoals;
         private String odds;
@@ -183,8 +205,18 @@ public class Fixture {
             return this;
         }
 
+        public FixtureBuilder homeTeamId(Long homeTeamId) {
+            this.homeTeamId = homeTeamId;
+            return this;
+        }
+
         public FixtureBuilder awayTeam(String awayTeam) {
             this.awayTeam = awayTeam;
+            return this;
+        }
+
+        public FixtureBuilder awayTeamId(Long awayTeamId) {
+            this.awayTeamId = awayTeamId;
             return this;
         }
 
@@ -214,8 +246,8 @@ public class Fixture {
         }
 
         public Fixture build() {
-            return new Fixture(id, date, statusLong, statusShort, leagueName, homeTeam, awayTeam, homeTeamGoals,
-                    awayTeamGoals, odds, winningTeamName, predictionComment);
+            return new Fixture(id, date, statusLong, statusShort, leagueName, homeTeam, homeTeamId, awayTeam,
+                    awayTeamId, homeTeamGoals, awayTeamGoals, odds, winningTeamName, predictionComment);
         }
     }
 }

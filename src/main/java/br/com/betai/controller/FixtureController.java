@@ -6,7 +6,10 @@ import org.slf4j.LoggerFactory;
 import br.com.betai.domain.Fixture;
 import br.com.betai.service.DynamoDBService;
 import br.com.betai.service.GeminiAnalysisService;
+import br.com.betai.service.MatchFilterService;
 import br.com.betai.service.NotificationService;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -26,12 +29,14 @@ public class FixtureController {
     private final NotificationService notificationService;
     private final GeminiAnalysisService geminiAnalysisService;
     private final DynamoDBService dynamoDBService;
+    private final MatchFilterService matchFilterService;
 
     public FixtureController(NotificationService notificationService, GeminiAnalysisService geminiAnalysisService,
-            DynamoDBService dynamoDBService) {
+            DynamoDBService dynamoDBService, MatchFilterService matchFilterService) {
         this.notificationService = notificationService;
         this.geminiAnalysisService = geminiAnalysisService;
         this.dynamoDBService = dynamoDBService;
+        this.matchFilterService = matchFilterService;
     }
 
     @GetMapping
@@ -48,12 +53,23 @@ public class FixtureController {
         return "Notification process triggered!";
     }
 
+    @GetMapping("/filter")
+    public String filterFixtures() {
+        matchFilterService.filtrarOportunidadesDoDia();
+        return "Filtragem de jogos iniciada! Verifique os logs/console para os resultados.";
+    }
+
+    @GetMapping("/filter-upcoming")
+    public String filterUpcomingFixtures() {
+        matchFilterService.filtrarOportunidadesProximasDuasHoras();
+        return "Filtragem de jogos próximos (2h) iniciada! Verifique os logs/console para os resultados.";
+    }
+
     @GetMapping("/{id}/analyze")
     public String analyzeFixture(@PathVariable Long id) {
         // Consulta DynamoDB que já contém todas as informações (ficha do jogo,
         // estatísticas e previsões)
-        java.util.Map<String, software.amazon.awssdk.services.dynamodb.model.AttributeValue> data = dynamoDBService
-                .getFixtureData(id);
+        java.util.Map<String, AttributeValue> data = dynamoDBService.getFixtureData(id);
 
         if (data == null) {
             return "Fixture não encontrada no DynamoDB";

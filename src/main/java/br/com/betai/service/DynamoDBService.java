@@ -119,10 +119,18 @@ public class DynamoDBService {
         if (fixtureMap.containsKey("teams")) {
             Map<String, AttributeValue> teams = fixtureMap.get("teams").m();
             if (teams.containsKey("home")) {
-                builder.homeTeam(teams.get("home").m().get("name").s());
+                Map<String, AttributeValue> home = teams.get("home").m();
+                builder.homeTeam(home.get("name").s());
+                if (home.containsKey("id")) {
+                    builder.homeTeamId(Long.valueOf(home.get("id").n()));
+                }
             }
             if (teams.containsKey("away")) {
-                builder.awayTeam(teams.get("away").m().get("name").s());
+                Map<String, AttributeValue> away = teams.get("away").m();
+                builder.awayTeam(away.get("name").s());
+                if (away.containsKey("id")) {
+                    builder.awayTeamId(Long.valueOf(away.get("id").n()));
+                }
             }
         }
 
@@ -176,13 +184,63 @@ public class DynamoDBService {
                     if (winner.containsKey("name")) {
                         builder.winningTeamName(winner.get("name").s());
                     }
-                    if (winner.containsKey("comment")) {
+                    if (winner.containsKey("comment") && winner.get("comment").s() != null) {
                         builder.predictionComment(winner.get("comment").s());
                     }
+                }
+                // Advice field is commonly used for the summary prediction in API-Football
+                if (innerPredictions.containsKey("advice") && innerPredictions.get("advice").s() != null) {
+                    builder.predictionComment(innerPredictions.get("advice").s());
                 }
             }
         }
 
         return builder.build();
+    }
+
+    public void updateIAAnalysis(Long fixtureId, Object analysisData) {
+        log.info("Salvando análise da IA estruturada no DynamoDB para a partida: {}", fixtureId);
+        try {
+            AttributeValue analysisValue = convertToAttributeValue(analysisData);
+
+            software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest request = software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest
+                    .builder().tableName(tableName)
+                    .key(Map.of("fixtureId", AttributeValue.builder().s(String.valueOf(fixtureId)).build()))
+                    .updateExpression("SET iaAnalysis = :analysis")
+                    .expressionAttributeValues(Map.of(":analysis", analysisValue)).build();
+
+            dynamoDbClient.updateItem(request);
+        } catch (Exception e) {
+            log.error("Erro ao salvar análise da IA no DynamoDB para a partida: {}", fixtureId, e);
+        }
+    }
+
+    private AttributeValue convertToAttributeValue(Object data) {
+        if (data == null)
+            return AttributeValue.builder().nul(true).build();
+
+        if (data instanceof Map) {
+            Map<?, ?> map = (Map<?, ?>) data;
+            Map<String, AttributeValue> avMap = new HashMap<>();
+            map.forEach((k, v) -> avMap.put(String.valueOf(k), convertToAttributeValue(v)));
+            return AttributeValue.builder().m(avMap).build();
+        } else if (data instanceof java.util.Collection) {
+            java.util.List<AttributeValue> list = ((java.util.Collection<?>) data).stream()
+                    .map(this::convertToAttributeValue).toList();
+            return AttributeValue.builder().l(list).build();
+        } else if (data instanceof Number) {
+            return AttributeValue.builder().n(String.valueOf(data)).build();
+        } else if (data instanceof Boolean) {
+            return AttributeValue.builder().bool((Boolean) data).build();
+        } else {
+            try {
+                Map<String, Object> map = objectMapper.convertValue(data,
+                        new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {
+                        });
+                return convertToAttributeValue(map);
+            } catch (Exception e) {
+                return AttributeValue.builder().s(String.valueOf(data)).build();
+            }
+        }
     }
 }

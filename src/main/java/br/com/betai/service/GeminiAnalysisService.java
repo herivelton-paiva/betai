@@ -1,6 +1,9 @@
 package br.com.betai.service;
 
+import br.com.betai.domain.AnalysisData;
 import br.com.betai.domain.Fixture;
+import br.com.betai.utils.AnalysisUtils;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,88 +20,93 @@ import java.util.Map;
 public class GeminiAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiAnalysisService.class);
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent";
+    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent";
 
     private final RestTemplate restTemplate;
+    private final DynamoDBService dynamoDBService;
+    private final ObjectMapper objectMapper;
 
     @Value("${gemini.api.key}")
     private String apiKey;
 
-    public GeminiAnalysisService(RestTemplate restTemplate) {
+    public GeminiAnalysisService(RestTemplate restTemplate, DynamoDBService dynamoDBService) {
         this.restTemplate = restTemplate;
+        this.dynamoDBService = dynamoDBService;
+        this.objectMapper = new ObjectMapper();
     }
 
     public String analyzeWithContext(Fixture fixture, String statistics, String predictions) {
-        if ("YOUR_GEMINI_API_KEY".equals(apiKey) || apiKey == null || apiKey.isEmpty()) {
-            return "⚠️ API Key do Gemini não configurada";
+        AnalysisData analysis = analyzeWithContextDetailed(fixture, statistics, predictions);
+        if (analysis == null) {
+            return "⚠️ Não foi possível obter análise detalhada do Gemini";
         }
 
-        String prompt = buildDetailedAnalysisPrompt(fixture, statistics, predictions);
-        String url = GEMINI_API_URL + "?key=" + apiKey;
-
-        try {
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentType(MediaType.APPLICATION_JSON);
-
-            Map<String, Object> requestBody = Map.of("contents",
-                    List.of(Map.of("parts", List.of(Map.of("text", prompt)))));
-
-            HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
-            GeminiResponse response = restTemplate.postForObject(url, request, GeminiResponse.class);
-
-            if (response != null && response.candidates() != null && !response.candidates().isEmpty()) {
-                return extractTextFromResponse(response);
-            }
-
-            return "⚠️ Não foi possível obter análise detalhada do Gemini";
-        } catch (Exception e) {
-            log.error("Error calling Gemini API for detailed analysis", e);
-            return "❌ Erro ao analisar com contexto: " + e.getMessage();
+        // Só retorna formatado se o EV for positivo
+        if ("POSITIVE".equals(analysis.getBetSuggestion().getStatusEv())
+                && analysis.getBetSuggestion().getOddBookmaker() > 0) {
+            log.info("Análise com valor encontrada para partida {}. Retornando resultado...", fixture.getId());
+            return AnalysisUtils.formatAnalysisToText(analysis, fixture);
+        } else {
+            log.info("Análise da partida {} descartada para exibição por falta de EV positivo (Calculado: {})",
+                    fixture.getId(), String.format("%.2f", analysis.getBetSuggestion().getExpectedValue()));
+            return "⚪ Análise descartada: Valor esperado (EV) negativo.";
         }
     }
 
-    private String buildDetailedAnalysisPrompt(Fixture fixture, String statistics, String predictions) {
-        String oddsSection = "";
-        if (fixture.getOdds() != null && !fixture.getOdds().isEmpty() && !"{ }".equals(fixture.getOdds())
-                && !"{}".equals(fixture.getOdds())) {
-            oddsSection = String.format("\n--- 💰 ODDS ATUAIS ---\n%s\n", fixture.getOdds());
+    public AnalysisData analyzeWithContextDetailed(Fixture fixture, String statistics, String predictions) {
+        if ("YOUR_GEMINI_API_KEY".equals(apiKey) || apiKey == null || apiKey.isEmpty()) {
+            log.warn("API Key do Gemini não configurada");
+            return null;
         }
 
-        String gameTime = fixture.getDate() != null
-                ? fixture.getDate().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
-                : "--/--/---- --:--";
+        var prompt = AnalysisUtils.buildDetailedAnalysisPrompt(fixture, statistics, predictions);
+        var url = GEMINI_API_URL + "?key=" + apiKey;
 
-        return String.format(
-                """
-                        Com base nos dados abaixo para o confronto %s x %s (%s):
-                        %s
-                        --- 📊 ESTATÍSTICAS REAIS ---
-                        %s
+        try {
+            var headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
 
-                        --- 🤖 PREVISÕES TÉCNICAS ---
-                        %s
+            Map<String, Object> requestBody = Map.of("contents",
+                    List.of(Map.of("parts", List.of(Map.of("text", prompt)))), "tools",
+                    List.of(Map.of("google_search", Map.of())));
 
-                        Forneça APENAS a Sugestão de Aposta seguindo EXATAMENTE o formato abaixo.
+            var request = new HttpEntity<Map<String, Object>>(requestBody, headers);
+            var response = restTemplate.postForObject(url, request, GeminiResponse.class);
 
-                        ⚠️ REGRAS OBRIGATÓRIAS:
-                        1. PROIBIDO 0%%: Nunca utilize 0%% de probabilidade para nenhum resultado (Casa, Empate, Fora), pois futebol aceita surpresas.
-                        2. ODDS EM TUDO: Sempre que houver ODDS ATUAIS fornecidas, coloque a Odd correspondente entre parênteses (ex: 1.85) imediatamente após cada sugestão, mercado, probabilidade ou placar provável.
-                        3. ODD COMBINADA: Se sugerir uma aposta com 2 condições (ex: Time A ou Empate E Menos de 3.5 gols), inclua a linha "Odd Combinada" com o valor total.
+            if (response != null && response.candidates() != null && !response.candidates().isEmpty()) {
+                var aiResponseRaw = extractTextFromResponse(response);
+                var analysis = AnalysisUtils.processAnalysisData(aiResponseRaw, objectMapper);
 
-                        ### 🎯 SUGESTÃO DE APOSTA (%s x %s - %s)
-                        **[Sua sugestão principal aqui (Odd)]**
-                        **Odd Combinada:** [Valor se houver 2 condições]
+                // Preencher campos extras para o DynamoDB (winner e win_or_draw)
+                String market = analysis.getBetSuggestion().getMarket();
+                boolean winOrDraw = market != null && (market.toLowerCase().contains("empate")
+                        || market.toLowerCase().contains("draw") || market.toLowerCase().contains("chance")
+                        || market.toLowerCase().contains("ou x"));
+                analysis.setWinOrDraw(winOrDraw);
 
-                        **🔥 MERCADO DE GOLS:** [Palpite de Gols (Odd)]
-                        **📊 PROBABILIDADES:** Casa: [%%] (Odd) | Empate: [%%] (Odd) | Fora: [%%] (Odd)
-                        **⚽ PLACAR PROVÁVEL:** %s [Placar] %s (Odd)
-                        **📈 NÍVEL DE CONFIANÇA:** [Baixo/Médio/Alto/Muito Alto]
+                if (market != null) {
+                    String lowerMarket = market.toLowerCase();
+                    String lowerHome = fixture.getHomeTeam().toLowerCase();
+                    String lowerAway = fixture.getAwayTeam().toLowerCase();
 
-                        Responda em português. Seja curto e direto.
-                        """,
-                fixture.getHomeTeam(), fixture.getAwayTeam(), fixture.getLeagueName(), oddsSection, statistics,
-                predictions, fixture.getHomeTeam(), fixture.getAwayTeam(), gameTime, fixture.getHomeTeam(),
-                fixture.getAwayTeam());
+                    if (lowerMarket.contains(lowerHome)) {
+                        analysis.setWinner(new AnalysisData.WinnerNode(fixture.getHomeTeamId(), fixture.getHomeTeam()));
+                    } else if (lowerMarket.contains(lowerAway)) {
+                        analysis.setWinner(new AnalysisData.WinnerNode(fixture.getAwayTeamId(), fixture.getAwayTeam()));
+                    } else if (lowerMarket.startsWith("vitoria casa") || lowerMarket.startsWith("1") || lowerMarket.contains("mandante")) {
+                        analysis.setWinner(new AnalysisData.WinnerNode(fixture.getHomeTeamId(), fixture.getHomeTeam()));
+                    } else if (lowerMarket.startsWith("vitoria fora") || lowerMarket.startsWith("2") || lowerMarket.contains("visitante")) {
+                        analysis.setWinner(new AnalysisData.WinnerNode(fixture.getAwayTeamId(), fixture.getAwayTeam()));
+                    }
+                }
+
+                dynamoDBService.updateIAAnalysis(fixture.getId(), analysis);
+                return analysis;
+            }
+        } catch (Exception e) {
+            log.error("Error calling Gemini API for detailed analysis", e);
+        }
+        return null;
     }
 
     private String extractTextFromResponse(GeminiResponse response) {

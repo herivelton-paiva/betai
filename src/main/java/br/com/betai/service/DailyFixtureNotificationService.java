@@ -51,7 +51,7 @@ public class DailyFixtureNotificationService {
     }
 
     @Scheduled(cron = "${notification.cron.nightly:0 55 23 * * *}", zone = "America/Sao_Paulo")
-    @Scheduled(cron = "${notification.cron.morning:0 */5 * * * *}", zone = "America/Sao_Paulo")
+    @Scheduled(cron = "${notification.cron.morning:0 0 2 * * *}", zone = "America/Sao_Paulo")
     public void sendDailyFixtures() {
         log.info("Iniciando tarefa agendada de notificação de partidas do dia...");
         LocalDate today = LocalDate.now();
@@ -132,24 +132,26 @@ public class DailyFixtureNotificationService {
 
         // Adicionar Resumo Estatístico
         long processed = greens + reds;
-        double winRate = processed > 0 ? (double) greens / processed * 100 : 0;
-        double lossRate = processed > 0 ? (double) reds / processed * 100 : 0;
+        if (processed > 0) {
+            double winRate = (double) greens / processed * 100;
+            double lossRate = (double) reds / processed * 100;
 
-        StringBuilder summary = new StringBuilder();
-        summary.append("\n📊 *RESUMO DO DIA*\n");
-        summary.append("Total de Jogos: ").append(totalGames).append("\n");
-        summary.append("✅ Greens: ").append(greens).append("\n");
-        summary.append("❌ Reds: ").append(reds).append("\n");
-        summary.append(String.format("📈 Acertos: %.1f%%\n", winRate));
-        summary.append(String.format("📉 Falhas: %.1f%%\n", lossRate));
-        summary.append(
-                String.format("💰 Saldo Total: %s R$ %.2f\n", totalProfit >= 0 ? "+" : "-", Math.abs(totalProfit)));
+            StringBuilder summary = new StringBuilder();
+            summary.append("\n📊 *RESUMO DO DIA*\n");
+            summary.append("Total de Jogos: ").append(totalGames).append("\n");
+            summary.append("✅ Greens: ").append(greens).append("\n");
+            summary.append("❌ Reds: ").append(reds).append("\n");
+            summary.append(String.format("📈 Acertos: %.1f%%\n", winRate));
+            summary.append(String.format("📉 Falhas: %.1f%%\n", lossRate));
+            summary.append(
+                    String.format("💰 Saldo Total: %s R$ %.2f\n", totalProfit >= 0 ? "+" : "-", Math.abs(totalProfit)));
 
-        if (messageBuilder.length() + summary.length() > 4000) {
-            chunks.add(messageBuilder.toString());
-            messageBuilder = new StringBuilder(summary.toString());
-        } else {
-            messageBuilder.append(summary);
+            if (messageBuilder.length() + summary.length() > 4000) {
+                chunks.add(messageBuilder.toString());
+                messageBuilder = new StringBuilder(summary.toString());
+            } else {
+                messageBuilder.append(summary);
+            }
         }
 
         chunks.add(messageBuilder.toString());
@@ -161,17 +163,21 @@ public class DailyFixtureNotificationService {
     }
 
     private String getResultIcon(Fixture fixture) {
-        String winnerName = fixture.getWinningTeamName();
-        String comment = fixture.getPredictionComment();
-
-        // Se não tem previsão, retorna interrogação
-        if (winnerName == null || comment == null) {
-            return "❓ ";
-        }
-
+        // Só exibe ícones (inclusive interrogação) se a partida tiver placar/estiver
+        // encerrada
         if (!"FT".equals(fixture.getStatusShort()) || fixture.getHomeTeamGoals() == null
                 || fixture.getAwayTeamGoals() == null) {
             return "";
+        }
+
+        String winnerName = fixture.getWinningTeamName();
+        String comment = fixture.getPredictionComment();
+
+        // Se não tem nada de previsão, retorna interrogação
+        if (winnerName == null && comment == null) {
+            log.warn("Fixture encerrada sem nenhuma previsão (WinnerName e Comment nulos) - ID: {}, Partida: {} x {}",
+                    fixture.getId(), fixture.getHomeTeam(), fixture.getAwayTeam());
+            return "❓ ";
         }
 
         int homeGoals = fixture.getHomeTeamGoals();
@@ -182,10 +188,21 @@ public class DailyFixtureNotificationService {
         boolean isDraw = (homeGoals == awayGoals);
 
         boolean green = false;
-        if (comment.contains("Win") && !comment.contains("draw")) {
+
+        if (comment != null) {
+            String lowerComment = comment.toLowerCase();
+            if (lowerComment.contains("draw") || lowerComment.contains("empate")) {
+                green = isWin || isDraw;
+            } else if (lowerComment.contains("win") || lowerComment.contains("vence")
+                    || lowerComment.contains("winner")) {
+                green = isWin;
+            } else {
+                // Se o comentário existe mas não é claro, mas temos um vencedor, assume win
+                green = winnerName != null && isWin;
+            }
+        } else {
+            // Se só temos o nome do vencedor, assume que a aposta era nela
             green = isWin;
-        } else if (comment.contains("draw")) {
-            green = isWin || isDraw;
         }
 
         return green ? "✅ " : "❌ ";

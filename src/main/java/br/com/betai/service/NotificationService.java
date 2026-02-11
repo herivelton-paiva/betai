@@ -47,9 +47,11 @@ public class NotificationService {
         List<String> chunks = new ArrayList<>();
         StringBuilder fullMessageBuilder = new StringBuilder(); // To store the full message for WhatsApp
         StringBuilder currentChunk = new StringBuilder();
-        currentChunk.append("⚽ *Partidas do dia ").append(today.toString()).append("*\n\n");
-        fullMessageBuilder.append("⚽ Partidas do dia ").append(today.toString()).append("\n\n"); // For WhatsApp, no
-                                                                                                 // Markdown
+        currentChunk.append("⚽ *Partidas do dia ").append(today.toString()).append(" (").append(fixtures.size())
+                .append(" Jogos)*\n\n");
+        fullMessageBuilder.append("⚽ Partidas do dia ").append(today.toString()).append(" (").append(fixtures.size())
+                .append(" Jogos)\n\n");
+        // Markdown
 
         for (Fixture fixture : fixtures) {
             String time = fixture.getDate().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"));
@@ -76,7 +78,7 @@ public class NotificationService {
         sendToWhatsApp(fullMessageBuilder.toString(), "5511959589952");
     }
 
-    private void sendToTelegram(String message, int part, int total) {
+    public void sendToTelegram(String message, int part, int total) {
         if ("YOUR_BOT_TOKEN".equals(botToken) || botToken == null || botToken.isEmpty()) {
             log.warn("Telegram Bot Token not configured. Skipping...");
             return;
