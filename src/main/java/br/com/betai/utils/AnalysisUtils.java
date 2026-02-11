@@ -27,94 +27,76 @@ public class AnalysisUtils {
 
     private static String buildPrompt(String home, String away, String league, String oddsSection, String statistics,
             String predictions, Long fixtureId, String date) {
-        return String.format(
-                """
-                        Você é um Analista de Apostas Profissional e Cientista de Dados.
-                        Analise o confronto %s x %s (%s) em %s.
+        return String.format("""
+                Você é um Analista de Apostas e Cientista de Dados.
+                Sua tarefa: Gerar uma análise técnica em JSON para o jogo %s x %s (%s) em %s.
 
-                        --- 📑 CONTEXTO E ODDS ATUAIS ---
-                        %s
-                        --- 📊 ESTATÍSTICAS HISTÓRICAS ---
-                        %s
-                        --- 🤖 PREVISÕES DE REFERÊNCIA (ESTATÍSTICA PURA) ---
-                        %s
-                        *Nota: Estas previsões são baseadas apenas em modelos matemáticos (Poisson/ELO) e servem apenas como ponto de partida.*
+                --- CONTEXTO E ODDS ---
+                %s
+                --- ESTATÍSTICAS ---
+                %s
+                --- MODELOS DE REFERÊNCIA ---
+                %s
 
-                        ⚠️ INSTRUÇÕES DE MISSÃO (CRÍTICO):
-                        1. INDEPENDÊNCIA ANALÍTICA: Você NÃO deve apenas replicar as 'PREVISÕES DE REFERÊNCIA'. Seu trabalho é ser um analista crítico. Se sua pesquisa sobre notícias, escalações e contexto sugerir um caminho diferente dos modelos matemáticos, sua análise INDEPENDENTE deve prevalecer. Use as previsões base apenas como contexto inicial.
+                REGRAS DE OURO:
+                1. INDEPENDÊNCIA: Use o contexto acima, mas pesquise por notícias (Search) e decida por conta própria.
+                2. MERCADOS PROIBIDOS: NUNCA sugira 'Handicap Asiático'. Use 1X2, Dupla Chance ou Gols.
+                3. FORMATO: Retorne APENAS o JSON puro. NADA de explicações, preâmbulos ou markdown.
+                4. IDIOMA: Português técnico (Brasil).
 
-                        2. PESQUISA EM TEMPO REAL: Use o Google Search para verificar:
-                        - Escalações: Há indícios de time reserva ou poupado devido a calendário (Libertadores, finais)?
-                        - Desfalques: Lesões de jogadores-chave (artilheiro, goleiro titular, capitão)?
-                        - Ambiente: O jogo será em altitude, clima extremo ou campo neutro?
-
-                        3. LÓGICA ESTATÍSTICA AVANÇADA:
-                        - Compare 'home.goals.against.average.home' com 'away.goals.for.average.away'. Se o ataque do visitante for superior à defesa do mandante em casa, isso justifica um aumento no 'confidence_level' para mercados como 'Ambas Marcam' ou 'Over Gols'.
-                        - Correlacione 'away.fixtures.loses.away' com o favoritismo das odds. Se o visitante perde muito fora mas as odds estão esmagadoramente a favor dele, use isso para decidir se há valor (EV+) real ou se é uma "trap", ajustando a confiança da análise.
-
-                        4. AJUSTE DE PROBABILIDADE: A 'probability_ai' deve ser o resultado final do seu raciocínio (Estatística + Notícias + Contexto).
-                        - Se os dados matemáticos apontam favoritismo, mas sua pesquisa indica time reserva, mude a sugestão de aposta para buscar o valor real (EV+).
-
-                        5. PIVOTAGEM PARA EV+: Se o mercado de 'Vencedor' tiver EV negativo, você DEVE vasculhar as 'ODDS ATUAIS' para encontrar mercados de 'Dupla Chance', 'Ambas Marcam' ou 'Gols Over/Under' que apresentem desajuste a favor do apostador.
-
-                        6. CÁLCULO DE PROBABILIDADE DO MERCADO:
-                        - Para mercados de 'Dupla Chance' (ex: 1X), a 'probability_ai' DEVE ser a soma das probabilidades individuais (Home Win + Draw). Ex: Se Home Win é 0.45 e Draw é 0.45, a 'probability_ai' para 1X DEVE ser 0.90.
-                        - NUNCA use a probabilidade de apenas um resultado para um mercado que engloba dois ou mais.
-
-                        7. REGRAS DE SAÍDA (OBRIGATÓRIO):
-                        - Seu output DEVE ser APENAS o objeto JSON puro.
-                        - NÃO inclua preâmbulos, explicações, saudações ou "Aqui está sua análise".
-                        - NÃO use blocos de código markdown (como ```json). Comece diretamente com { e termine com }.
-                        - Linguagem: Português Brasil.
-
-                        ESTRUTURA DO JSON:
-                        {
-                        "fixture": { "id": %d, "teams": { "home": "%s", "away": "%s" }, "date": "%s" },
-                        "bet_suggestion": {
-                            "market": "Nome do Mercado",
-                            "odd_bookmaker": 0.00,
-                            "probability_ai": 0.00,
-                            "justification": "Explicação técnica curta (notícias/clima/escalação)"
-                        },
-                        "goals_market": { "target": "Mercado de Gols", "odd": 0.00 },
-                        "probabilities": { "home_win": 0.00, "draw": 0.00, "away_win": 0.00, "confidence_level": "BAIXO/MEDIO/ALTO" },
-                        "prediction": { "correct_score": "X:Y", "score_odd": 0.00 }
-                        }
-                        """,
-                home, away, league, date, oddsSection, statistics, predictions, fixtureId, home, away, date);
+                ESTRUTURA OBRIGATÓRIA (JSON):
+                {
+                "fixture": { "id": %d, "teams": { "home": "%s", "away": "%s" }, "date": "%s" },
+                "bet_suggestion": {
+                    "market": "Mercado Selecionado",
+                    "odd_bookmaker": 0.00,
+                    "probability_ai": 0.00,
+                    "justification": "Explicação técnica curta"
+                },
+                "goals_market": { "target": "Mercado de Gols", "odd": 0.00 },
+                "probabilities": { "home_win": 0.00, "draw": 0.00, "away_win": 0.00, "confidence_level": "MEDIO" },
+                "prediction": { "correct_score": "X:Y", "score_odd": 0.00 }
+                }
+                """, home, away, league, date, oddsSection, statistics, predictions, fixtureId, home, away, date);
     }
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AnalysisUtils.class);
 
     public static AnalysisData processAnalysisData(String aiResponseRaw, ObjectMapper objectMapper)
             throws JsonProcessingException {
-        // Extrair JSON da resposta buscando do primeiro { ao último }
-        int firstBrace = aiResponseRaw.indexOf('{');
-        int lastBrace = aiResponseRaw.lastIndexOf('}');
-
-        if (firstBrace == -1 || lastBrace == -1 || lastBrace < firstBrace) {
-            log.error("Resposta da IA não contém um bloco JSON válido: {}", aiResponseRaw);
-            throw new com.fasterxml.jackson.databind.JsonMappingException(null,
-                    "Formato JSON não encontrado na resposta da IA");
+        if (aiResponseRaw == null || aiResponseRaw.trim().isEmpty()) {
+            throw new com.fasterxml.jackson.databind.JsonMappingException(null, "Resposta da IA veio vazia.");
         }
 
-        var jsonStr = aiResponseRaw.substring(firstBrace, lastBrace + 1);
+        // Remove markdown code blocks BEFORE seeking braces
+        String raw = aiResponseRaw.replace("```json", "").replace("```", "").trim();
 
-        // Limpeza de erros comuns de JSON gerados por IA (como vírgulas extras no final
-        // de objetos)
+        // Extrair JSON da resposta buscando do primeiro { ao último }
+        int firstBrace = raw.indexOf('{');
+        int lastBrace = raw.lastIndexOf('}');
+
+        if (firstBrace == -1 || lastBrace == -1 || lastBrace < firstBrace) {
+            log.error("JSON não encontrado. Resposta completa do Gemini: \n{}", aiResponseRaw);
+            throw new com.fasterxml.jackson.databind.JsonMappingException(null,
+                    "ERRO: O Gemini não retornou um JSON válido. Verifique os logs para ver a resposta bruta.");
+        }
+
+        var jsonStr = raw.substring(firstBrace, lastBrace + 1);
+
+        // Limpeza agressiva de vírgulas pendentes
         jsonStr = jsonStr.replaceAll(",\\s*([}\\]])", "$1");
 
         AnalysisData analysis;
         try {
             analysis = objectMapper.readValue(jsonStr, AnalysisData.class);
         } catch (Exception e) {
-            log.warn("Falha ao ler JSON (possivelmente truncado). Tentando reparar... Erro: {}", e.getMessage());
+            log.warn("Falha no parse inicial (provavelmente truncado). Tentando reparar... Erro: {}", e.getMessage());
             try {
                 var repairedJson = repairJson(jsonStr);
                 analysis = objectMapper.readValue(repairedJson, AnalysisData.class);
-                log.info("JSON reparado com sucesso.");
+                log.info("JSON reparado com sucesso via algoritmo de emergência.");
             } catch (Exception e2) {
-                log.error("Falha ao processar JSON mesmo após tentativa de reparo. JSON Bruto extraído: \n{}", jsonStr);
+                log.error("FALHA CRÍTICA NO PARSE. JSON extraído: \n{}", jsonStr);
                 throw e2;
             }
         }

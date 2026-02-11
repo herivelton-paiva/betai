@@ -75,6 +75,7 @@ public class GeminiAnalysisService {
 
             if (response != null && response.candidates() != null && !response.candidates().isEmpty()) {
                 var aiResponseRaw = extractTextFromResponse(response);
+                log.info("Gemini Raw Response for fixture {}:\n{}", fixture.getId(), aiResponseRaw);
                 var analysis = AnalysisUtils.processAnalysisData(aiResponseRaw, objectMapper);
 
                 // Preencher campos extras para o DynamoDB (winner e win_or_draw)
