@@ -56,7 +56,11 @@ public class AnalysisUtils {
                            - VALOR: Procure o melhor EV+.
                         4. PROIBIÇÃO DE ZEROS: Os campos 'odd_bookmaker' e 'probability_ai' NUNCA podem ser 0.00. Extraia a odd da seção 'ODDS ATUAIS' ou estime uma odd realista baseada no mercado.
                         5. CONSISTÊNCIA: A 'probability_ai' DEVE ser a soma das probabilidades individuais do mercado (Ex: Dupla Chance = win + draw).
-                        6. FORMATO: JSON puro. NADA de preâmbulos ou markdown. Idioma: Português (Brasil).
+                        6. NÍVEL DE CONFIANÇA (confidence_level):
+                           - ALTO: Probabilidade sugerida > 70%% OU forte evidência estatística e contexto claro.
+                           - MEDIO: Probabilidade entre 50%% e 70%% OU contexto com algumas incertezas.
+                           - BAIXO: Jogos muito equilibrados, mata-mata volátil ou dúvidas sobre escalação reserva.
+                        7. FORMATO: JSON puro. NADA de preâmbulos ou markdown. Idioma: Português (Brasil).
 
                         ESTRUTURA OBRIGATÓRIA (JSON):
                         {
