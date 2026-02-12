@@ -17,13 +17,15 @@ public class Fixture {
     private String odds;
     private String winningTeamName;
     private String predictionComment;
+    private AnalysisData iaAnalysis;
 
     public Fixture() {
     }
 
     public Fixture(Long id, LocalDateTime date, String statusLong, String statusShort, String leagueName,
             String homeTeam, Long homeTeamId, String awayTeam, Long awayTeamId, Integer homeTeamGoals,
-            Integer awayTeamGoals, String odds, String winningTeamName, String predictionComment) {
+            Integer awayTeamGoals, String odds, String winningTeamName, String predictionComment,
+            AnalysisData iaAnalysis) {
         this.id = id;
         this.date = date;
         this.statusLong = statusLong;
@@ -38,6 +40,7 @@ public class Fixture {
         this.odds = odds;
         this.winningTeamName = winningTeamName;
         this.predictionComment = predictionComment;
+        this.iaAnalysis = iaAnalysis;
     }
 
     public static FixtureBuilder builder() {
@@ -156,6 +159,14 @@ public class Fixture {
         this.predictionComment = predictionComment;
     }
 
+    public AnalysisData getIaAnalysis() {
+        return iaAnalysis;
+    }
+
+    public void setIaAnalysis(AnalysisData iaAnalysis) {
+        this.iaAnalysis = iaAnalysis;
+    }
+
     public static class FixtureBuilder {
         private Long id;
         private LocalDateTime date;
@@ -171,6 +182,7 @@ public class Fixture {
         private String odds;
         private String winningTeamName;
         private String predictionComment;
+        private AnalysisData iaAnalysis;
 
         FixtureBuilder() {
         }
@@ -245,9 +257,14 @@ public class Fixture {
             return this;
         }
 
+        public FixtureBuilder iaAnalysis(AnalysisData iaAnalysis) {
+            this.iaAnalysis = iaAnalysis;
+            return this;
+        }
+
         public Fixture build() {
             return new Fixture(id, date, statusLong, statusShort, leagueName, homeTeam, homeTeamId, awayTeam,
-                    awayTeamId, homeTeamGoals, awayTeamGoals, odds, winningTeamName, predictionComment);
+                    awayTeamId, homeTeamGoals, awayTeamGoals, odds, winningTeamName, predictionComment, iaAnalysis);
         }
     }
 }

@@ -50,11 +50,21 @@ public class DailyFixtureNotificationService {
                 nightlyCron, morningCron);
     }
 
-    @Scheduled(cron = "${notification.cron.nightly:0 55 23 * * *}", zone = "America/Sao_Paulo")
+    @Scheduled(cron = "${notification.cron.nightly:0 0 1 * * *}", zone = "America/Sao_Paulo")
+    public void sendBeforeDayFixtures() {
+        log.info("Iniciando tarefa agendada de notificação de partidas do dia anterior com os resultados");
+        var date = LocalDate.now().minusDays(1);
+        getAllMatches(date);
+    }
+
     @Scheduled(cron = "${notification.cron.morning:0 0 2 * * *}", zone = "America/Sao_Paulo")
     public void sendDailyFixtures() {
         log.info("Iniciando tarefa agendada de notificação de partidas do dia...");
         LocalDate today = LocalDate.now();
+        getAllMatches(today);
+    }
+
+    private void getAllMatches(LocalDate today) {
         List<Fixture> fixtures = dynamoDBService.getFixturesByDate(today).stream().map(dynamoDBService::mapToFixture)
                 .filter(java.util.Objects::nonNull).toList();
 
@@ -267,7 +277,6 @@ public class DailyFixtureNotificationService {
 
         try {
             restTemplate.postForEntity(url, body, String.class);
-            log.info("Parte {}/{} da notificação enviada para o Telegram com sucesso!", part, total);
         } catch (HttpStatusCodeException e) {
             log.error("Erro na API do Telegram ({}): {} - Body snippet: {}", e.getStatusCode(),
                     e.getResponseBodyAsString(), message.substring(0, Math.min(message.length(), 100)));

@@ -10,7 +10,9 @@ import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.GetItemResponse;
 
+import br.com.betai.domain.AnalysisData;
 import br.com.betai.domain.Fixture;
+import br.com.betai.utils.AnalysisUtils;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.time.OffsetDateTime;
 import java.util.Map;
@@ -80,20 +82,37 @@ public class DynamoDBService {
     }
 
     public java.util.List<Map<String, AttributeValue>> getFixturesByDate(java.time.LocalDate date) {
-        log.info("Buscando jogos no DynamoDB para a data: {}", date);
         String dateStr = date.toString();
+        java.util.List<Map<String, AttributeValue>> allItems = new java.util.ArrayList<>();
+        Map<String, AttributeValue> lastKeyEvaluated = null;
 
         try {
-            software.amazon.awssdk.services.dynamodb.model.ScanRequest scanRequest = software.amazon.awssdk.services.dynamodb.model.ScanRequest
-                    .builder().tableName(tableName).filterExpression("begins_with(gameDate, :date)")
-                    .expressionAttributeValues(Map.of(":date", AttributeValue.builder().s(dateStr).build())).build();
+            do {
+                software.amazon.awssdk.services.dynamodb.model.ScanRequest.Builder scanRequestBuilder = software.amazon.awssdk.services.dynamodb.model.ScanRequest
+                        .builder().tableName(tableName).filterExpression("begins_with(gameDate, :date)")
+                        .expressionAttributeValues(Map.of(":date", AttributeValue.builder().s(dateStr).build()));
 
-            software.amazon.awssdk.services.dynamodb.model.ScanResponse response = dynamoDbClient.scan(scanRequest);
-            return response.items();
+                if (lastKeyEvaluated != null && !lastKeyEvaluated.isEmpty()) {
+                    scanRequestBuilder.exclusiveStartKey(lastKeyEvaluated);
+                }
+
+                software.amazon.awssdk.services.dynamodb.model.ScanResponse response = dynamoDbClient
+                        .scan(scanRequestBuilder.build());
+                allItems.addAll(response.items());
+                lastKeyEvaluated = response.lastEvaluatedKey();
+
+            } while (lastKeyEvaluated != null && !lastKeyEvaluated.isEmpty());
+
+            log.info("Total de jogos encontrados para {}: {}", date, allItems.size());
+            return allItems;
         } catch (Exception e) {
             log.error("Erro ao buscar jogos por data no DynamoDB", e);
             throw new RuntimeException("Falha ao buscar jogos no DynamoDB: " + e.getMessage(), e);
         }
+    }
+
+    public java.util.List<Fixture> getFixturesByDateMapped(java.time.LocalDate date) {
+        return getFixturesByDate(date).stream().map(this::mapToFixture).filter(java.util.Objects::nonNull).toList();
     }
 
     public Fixture mapToFixture(Map<String, AttributeValue> data) {
@@ -192,6 +211,18 @@ public class DynamoDBService {
                 if (innerPredictions.containsKey("advice") && innerPredictions.get("advice").s() != null) {
                     builder.predictionComment(innerPredictions.get("advice").s());
                 }
+            }
+        }
+
+        // IA Analysis
+        if (data.containsKey("iaAnalysis")) {
+            try {
+                String json = convertAttributeValueToJson(data.get("iaAnalysis"));
+                AnalysisData analysis = objectMapper.readValue(json, AnalysisData.class);
+                AnalysisUtils.sanitizeAnalysisData(analysis);
+                builder.iaAnalysis(analysis);
+            } catch (Exception e) {
+                log.warn("Erro ao mapear iaAnalysis para a partida {}", fixtureMap.get("fixtureId").n());
             }
         }
 

@@ -1,16 +1,10 @@
 package br.com.betai.controller;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
 import br.com.betai.domain.Fixture;
 import br.com.betai.service.DynamoDBService;
 import br.com.betai.service.GeminiAnalysisService;
 import br.com.betai.service.MatchFilterService;
-import br.com.betai.service.NotificationService;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-
-import org.springframework.format.annotation.DateTimeFormat;
+import br.com.betai.service.MultiBetService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -19,81 +13,60 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/fixtures")
 public class FixtureController {
 
-    private static final Logger log = LoggerFactory.getLogger(FixtureController.class);
-
-    private final NotificationService notificationService;
-    private final GeminiAnalysisService geminiAnalysisService;
     private final DynamoDBService dynamoDBService;
     private final MatchFilterService matchFilterService;
+    private final GeminiAnalysisService geminiAnalysisService;
+    private final MultiBetService multiBetService;
 
-    public FixtureController(NotificationService notificationService, GeminiAnalysisService geminiAnalysisService,
-            DynamoDBService dynamoDBService, MatchFilterService matchFilterService) {
-        this.notificationService = notificationService;
-        this.geminiAnalysisService = geminiAnalysisService;
+    public FixtureController(DynamoDBService dynamoDBService, MatchFilterService matchFilterService,
+            GeminiAnalysisService geminiAnalysisService, MultiBetService multiBetService) {
         this.dynamoDBService = dynamoDBService;
         this.matchFilterService = matchFilterService;
+        this.geminiAnalysisService = geminiAnalysisService;
+        this.multiBetService = multiBetService;
     }
 
     @GetMapping
-    public List<Fixture> getFixtures(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        LocalDate searchDate = (date != null) ? date : LocalDate.now();
-        return dynamoDBService.getFixturesByDate(searchDate).stream().map(dynamoDBService::mapToFixture)
-                .filter(java.util.Objects::nonNull).toList();
-    }
-
-    @GetMapping("/notify")
-    public String triggerNotification() {
-        notificationService.sendDailyFixtures();
-        return "Notification process triggered!";
+    public List<Fixture> getFixtures(@RequestParam(required = false) String date) {
+        LocalDate localDate = (date != null) ? LocalDate.parse(date) : LocalDate.now();
+        return dynamoDBService.getFixturesByDateMapped(localDate);
     }
 
     @GetMapping("/filter")
     public String filterFixtures() {
         matchFilterService.filtrarOportunidadesDoDia();
-        return "Filtragem de jogos iniciada! Verifique os logs/console para os resultados.";
+        return "Processamento de filtro iniciado e mensagens enviadas para o SQS.";
     }
 
     @GetMapping("/filter-upcoming")
     public String filterUpcomingFixtures() {
         matchFilterService.filtrarOportunidadesProximasDuasHoras();
-        return "Filtragem de jogos próximos (2h) iniciada! Verifique os logs/console para os resultados.";
+        return "Processamento de filtro para as próximas 2 horas iniciado.";
+    }
+
+    @GetMapping("/multiples")
+    public String generateMultiples() {
+        multiBetService.generateAndSendMultiples();
+        return "Processamento de múltiplas iniciado.";
     }
 
     @GetMapping("/{id}/analyze")
     public String analyzeFixture(@PathVariable Long id) {
-        // Consulta DynamoDB que já contém todas as informações (ficha do jogo,
-        // estatísticas e previsões)
-        java.util.Map<String, AttributeValue> data = dynamoDBService.getFixtureData(id);
-
+        Map<String, software.amazon.awssdk.services.dynamodb.model.AttributeValue> data = dynamoDBService
+                .getFixtureData(id);
         if (data == null) {
-            return "Fixture não encontrada no DynamoDB";
+            return "Partida não encontrada no DynamoDB.";
         }
 
-        // Mapeia os dados da partida diretamente do JSON do DynamoDB
         Fixture fixture = dynamoDBService.mapToFixture(data);
-
-        if (fixture == null) {
-            return "Dados da partida (fixture) não encontrados no registro do DynamoDB";
-        }
-
-        String statistics = "Estatísticas não encontradas no DynamoDB.";
-        String predictions = "Previsões não encontradas no DynamoDB.";
-
-        if (data.containsKey("stats")) {
-            statistics = dynamoDBService.convertAttributeValueToJson(data.get("stats"));
-        }
-        if (data.containsKey("predictions")) {
-            predictions = dynamoDBService.convertAttributeValueToJson(data.get("predictions"));
-        }
-
-        log.info("Fixture recuperada: {} x {} ({})", fixture.getHomeTeam(), fixture.getAwayTeam(),
-                fixture.getLeagueName());
+        String statistics = dynamoDBService.convertAttributeValueToJson(data.get("statistics"));
+        String predictions = dynamoDBService.convertAttributeValueToJson(data.get("predictions"));
 
         return geminiAnalysisService.analyzeWithContext(fixture, statistics, predictions);
     }

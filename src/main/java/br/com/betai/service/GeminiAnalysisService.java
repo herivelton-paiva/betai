@@ -66,9 +66,9 @@ public class GeminiAnalysisService {
             var headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
 
-            Map<String, Object> requestBody = Map.of("contents",
-                    List.of(Map.of("parts", List.of(Map.of("text", prompt)))), "tools",
-                    List.of(Map.of("google_search", Map.of())));
+            Map<String, Object> requestBody = Map.of(
+                    "contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
+                    "tools", List.of(Map.of("google_search", Map.of())));
 
             var request = new HttpEntity<Map<String, Object>>(requestBody, headers);
             var response = restTemplate.postForObject(url, request, GeminiResponse.class);
@@ -94,9 +94,11 @@ public class GeminiAnalysisService {
                         analysis.setWinner(new AnalysisData.WinnerNode(fixture.getHomeTeamId(), fixture.getHomeTeam()));
                     } else if (lowerMarket.contains(lowerAway)) {
                         analysis.setWinner(new AnalysisData.WinnerNode(fixture.getAwayTeamId(), fixture.getAwayTeam()));
-                    } else if (lowerMarket.startsWith("vitoria casa") || lowerMarket.startsWith("1") || lowerMarket.contains("mandante")) {
+                    } else if (lowerMarket.startsWith("vitoria casa") || lowerMarket.startsWith("1")
+                            || lowerMarket.contains("mandante")) {
                         analysis.setWinner(new AnalysisData.WinnerNode(fixture.getHomeTeamId(), fixture.getHomeTeam()));
-                    } else if (lowerMarket.startsWith("vitoria fora") || lowerMarket.startsWith("2") || lowerMarket.contains("visitante")) {
+                    } else if (lowerMarket.startsWith("vitoria fora") || lowerMarket.startsWith("2")
+                            || lowerMarket.contains("visitante")) {
                         analysis.setWinner(new AnalysisData.WinnerNode(fixture.getAwayTeamId(), fixture.getAwayTeam()));
                     }
                 }

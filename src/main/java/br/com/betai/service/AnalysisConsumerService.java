@@ -39,21 +39,18 @@ public class AnalysisConsumerService {
 
             if (analysis != null) {
                 // Só envia se o EV for positivo
-                if ("POSITIVE".equals(analysis.getBetSuggestion().getStatusEv())
-                        && analysis.getBetSuggestion().getOddBookmaker() > 0) {
+                if (analysis.getBetSuggestion().getOddBookmaker() > 0) {
 
                     String telegramMessage = AnalysisUtils.formatAnalysisToTelegram(analysis, fixture);
-                    log.info("Enviando análise para o Telegram...");
                     notificationService.sendToTelegram(telegramMessage, 1, 1);
 
                 } else {
-                    log.info("Análise da partida {} descartada por falta de EV positivo.", fixture.getId());
+                    log.info("Análise da partida {} descartada por falta de Odd.", fixture.getId());
                 }
             }
 
-            log.info("Aguardando 30 segundos antes de processar a próxima mensagem...");
-            Thread.sleep(30000);
-            log.info("Pausa concluída. Finalizando processamento desta mensagem.");
+            log.info("Aguardando 20 segundos antes de processar a próxima mensagem...");
+            Thread.sleep(20000);
 
         } catch (InterruptedException e) {
             log.warn("Processamento SQS interrompido: {}", e.getMessage());

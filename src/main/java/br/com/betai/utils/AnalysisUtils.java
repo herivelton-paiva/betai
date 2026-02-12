@@ -2,10 +2,13 @@ package br.com.betai.utils;
 
 import br.com.betai.domain.AnalysisData;
 import br.com.betai.domain.Fixture;
+import br.com.betai.domain.MultiBetResponse;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.stream.Collectors;
 
 public class AnalysisUtils {
 
@@ -27,37 +30,49 @@ public class AnalysisUtils {
 
     private static String buildPrompt(String home, String away, String league, String oddsSection, String statistics,
             String predictions, Long fixtureId, String date) {
-        return String.format("""
-                Você é um Analista de Apostas e Cientista de Dados.
-                Sua tarefa: Gerar uma análise técnica em JSON para o jogo %s x %s (%s) em %s.
+        return String.format(
+                """
+                        Você é um Analista de Apostas e Cientista de Dados especializado em futebol.
+                        Sua tarefa: Gerar uma análise técnica em JSON para o jogo %s x %s (%s) em %s.
 
-                --- CONTEXTO E ODDS ---
-                %s
-                --- ESTATÍSTICAS ---
-                %s
-                --- MODELOS DE REFERÊNCIA ---
-                %s
+                        --- CONTEXTO E ODDS ---
+                        %s
+                        --- ESTATÍSTICAS ---
+                        %s
+                        --- MODELOS DE REFERÊNCIA ---
+                        %s
 
-                REGRAS DE OURO:
-                1. INDEPENDÊNCIA: Use o contexto acima, mas pesquise por notícias (Search) e decida por conta própria.
-                2. MERCADOS PROIBIDOS: NUNCA sugira 'Handicap Asiático'. Use 1X2, Dupla Chance ou Gols.
-                3. FORMATO: Retorne APENAS o JSON puro. NADA de explicações, preâmbulos ou markdown.
-                4. IDIOMA: Português técnico (Brasil).
+                        REGRAS DE OURO:
+                        1. CONTEXTO CRÍTICO: Use a ferramenta de busca (Search) para verificar se o jogo é ELIMINATÓRIO (Mata-mata) ou se há TIMES RESERVAS. Isso deve ter peso de 80%% na sua decisão.
+                        2. MERCADOS PERMITIDOS:
+                           - Vitoria do [Nome do Time]
+                           - Gols Over/Under (Ex: Mais de 2.5 Gols)
+                           - Ambas Marcam (Ex: Ambas Marcam: Sim)
+                           - Empate Anula: [Nome do Time]
+                           - Vencedor 1º Tempo: [Nome do Time]
+                           - Dupla Chance: [Sugestão] (Ex: Dupla Chance: Corinthians ou Empate)
+                        3. ESTRATÉGIA DE SEGURANÇA (CRÍTICO):
+                           - EQUILÍBRIO: Se a diferença de probabilidade entre Vitória Casa e Fora for menor que 15%%, você DEVE preferir mercados de proteção como "Dupla Chance" ou "Empate Anula".
+                           - VALOR: Procure o melhor EV+.
+                        4. PROIBIÇÃO DE ZEROS: Os campos 'odd_bookmaker' e 'probability_ai' NUNCA podem ser 0.00. Extraia a odd da seção 'ODDS ATUAIS' ou estime uma odd realista baseada no mercado.
+                        5. CONSISTÊNCIA: A 'probability_ai' DEVE ser a soma das probabilidades individuais do mercado (Ex: Dupla Chance = win + draw).
+                        6. FORMATO: JSON puro. NADA de preâmbulos ou markdown. Idioma: Português (Brasil).
 
-                ESTRUTURA OBRIGATÓRIA (JSON):
-                {
-                "fixture": { "id": %d, "teams": { "home": "%s", "away": "%s" }, "date": "%s" },
-                "bet_suggestion": {
-                    "market": "Mercado Selecionado",
-                    "odd_bookmaker": 0.00,
-                    "probability_ai": 0.00,
-                    "justification": "Explicação técnica curta"
-                },
-                "goals_market": { "target": "Mercado de Gols", "odd": 0.00 },
-                "probabilities": { "home_win": 0.00, "draw": 0.00, "away_win": 0.00, "confidence_level": "MEDIO" },
-                "prediction": { "correct_score": "X:Y", "score_odd": 0.00 }
-                }
-                """, home, away, league, date, oddsSection, statistics, predictions, fixtureId, home, away, date);
+                        ESTRUTURA OBRIGATÓRIA (JSON):
+                        {
+                        "fixture": { "id": %d, "teams": { "home": "%s", "away": "%s" }, "date": "%s" },
+                        "bet_suggestion": {
+                            "market": "Vitoria do [Nome do Time]",
+                            "odd_bookmaker": 1.95,
+                            "probability_ai": 0.55,
+                            "justification": "justificativa curta aqui, indicar se tiver escalacao reserva"
+                        },
+                        "goals_market": { "target": "Mais de 1.5 Gols", "odd": 1.80 },
+                        "probabilities": { "home_win": 0.55, "draw": 0.25, "away_win": 0.20, "confidence_level": "ALTO" },
+                        "prediction": { "correct_score": "2:1", "score_odd": 8.50 }
+                        }
+                        """,
+                home, away, league, date, oddsSection, statistics, predictions, fixtureId, home, away, date);
     }
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AnalysisUtils.class);
@@ -101,10 +116,7 @@ public class AnalysisUtils {
             }
         }
 
-        // Se a IA não enviou bet_suggestion (erro raro), garantir que o objeto exista
-        if (analysis.getBetSuggestion() == null) {
-            analysis.setBetSuggestion(new AnalysisData.BetSuggestion());
-        }
+        sanitizeAnalysisData(analysis);
 
         // Executar cálculos no backend para garantir precisão total
         var prob = analysis.getBetSuggestion().getProbabilityAi();
@@ -134,6 +146,168 @@ public class AnalysisUtils {
         }
 
         return analysis;
+    }
+
+    public static void sanitizeAnalysisData(AnalysisData data) {
+        if (data == null)
+            return;
+        if (data.getBetSuggestion() == null) {
+            data.setBetSuggestion(new AnalysisData.BetSuggestion());
+        }
+        if (data.getBetSuggestion().getMarket() == null) {
+            data.getBetSuggestion().setMarket("Indisponível");
+        }
+        if (data.getGoalsMarket() == null) {
+            data.setGoalsMarket(new AnalysisData.GoalsMarket());
+        }
+        if (data.getGoalsMarket().getTarget() == null) {
+            data.getGoalsMarket().setTarget("N/A");
+        }
+        if (data.getProbabilities() == null) {
+            data.setProbabilities(new AnalysisData.Probabilities());
+        }
+        if (data.getProbabilities().getConfidenceLevel() == null) {
+            data.getProbabilities().setConfidenceLevel("MEDIO");
+        }
+
+        // Correção automática para o erro comum da IA usar o termo genérico "Vencedor
+        // 1x2"
+        String currentMarket = data.getBetSuggestion().getMarket();
+        if (currentMarket != null && (currentMarket.equalsIgnoreCase("Vencedor 1x2")
+                || currentMarket.equalsIgnoreCase("1x2") || currentMarket.equalsIgnoreCase("Vencedor"))) {
+
+            if (data.getFixture() != null && data.getFixture().getTeams() != null) {
+                if (data.getProbabilities().getHomeWin() > data.getProbabilities().getAwayWin()
+                        && data.getProbabilities().getHomeWin() > data.getProbabilities().getDraw()) {
+                    data.getBetSuggestion().setMarket("Vencedor: " + data.getFixture().getTeams().getHome());
+                } else if (data.getProbabilities().getAwayWin() > data.getProbabilities().getHomeWin()
+                        && data.getProbabilities().getAwayWin() > data.getProbabilities().getDraw()) {
+                    data.getBetSuggestion().setMarket("Vencedor: " + data.getFixture().getTeams().getAway());
+                } else {
+                    data.getBetSuggestion().setMarket("Vencedor: Empate");
+                }
+            } else {
+                // Fallback caso o objeto fixture esteja incompleto no JSON
+                data.getBetSuggestion().setMarket("Vencedor (Favorito)");
+            }
+        }
+
+        // Failsafe: Se a probabilidade da sugestão veio zerada mas temos as
+        // probabilidades individuais
+        if (data.getBetSuggestion().getProbabilityAi() <= 0 && data.getProbabilities() != null) {
+            String market = data.getBetSuggestion().getMarket().toLowerCase();
+            var p = data.getProbabilities();
+            if (market.contains("vitoria") || market.contains("vencedor")) {
+                if (data.getFixture() != null && data.getFixture().getTeams() != null) {
+                    if (market.contains(data.getFixture().getTeams().getHome().toLowerCase()))
+                        data.getBetSuggestion().setProbabilityAi(p.getHomeWin());
+                    else if (market.contains(data.getFixture().getTeams().getAway().toLowerCase()))
+                        data.getBetSuggestion().setProbabilityAi(p.getAwayWin());
+                }
+            } else if (market.contains("dupla chance") || market.contains("ou empate")) {
+                if (data.getFixture() != null && data.getFixture().getTeams() != null) {
+                    if (market.contains(data.getFixture().getTeams().getHome().toLowerCase()))
+                        data.getBetSuggestion().setProbabilityAi(p.getHomeWin() + p.getDraw());
+                    else if (market.contains(data.getFixture().getTeams().getAway().toLowerCase()))
+                        data.getBetSuggestion().setProbabilityAi(p.getAwayWin() + p.getDraw());
+                }
+            } else if (market.contains("empate anula")) {
+                if (data.getFixture() != null && data.getFixture().getTeams() != null) {
+                    if (market.contains(data.getFixture().getTeams().getHome().toLowerCase()))
+                        data.getBetSuggestion().setProbabilityAi(p.getHomeWin());
+                    else if (market.contains(data.getFixture().getTeams().getAway().toLowerCase()))
+                        data.getBetSuggestion().setProbabilityAi(p.getAwayWin());
+                }
+            }
+        }
+    }
+
+    public static String buildMultiBetPrompt(List<Fixture> analyzedFixtures) {
+        String dataJson = analyzedFixtures.stream().map(f -> {
+            AnalysisData m = f.getIaAnalysis();
+            sanitizeAnalysisData(m);
+            String market = m.getBetSuggestion().getMarket();
+            double odd = m.getBetSuggestion().getOddBookmaker();
+            double prob = m.getBetSuggestion().getProbabilityAi();
+            String goalsTarget = m.getGoalsMarket().getTarget() != null ? m.getGoalsMarket().getTarget() : "N/A";
+            double goalsOdd = m.getGoalsMarket().getOdd();
+            String fullOdds = f.getOdds() != null ? f.getOdds() : "{}";
+
+            return String.format(
+                    "{ \"id\": %d, \"home\": \"%s\", \"away\": \"%s\", \"date\": \"%s\", \"suggestion\": \"%s\", \"odd\": %.2f, \"prob\": %.2f, \"goals\": \"%s\", \"goals_odd\": %.2f, \"full_odds_context\": %s }",
+                    f.getId(), f.getHomeTeam(), f.getAwayTeam(), f.getDate(), market, odd, prob, goalsTarget, goalsOdd,
+                    fullOdds);
+        }).collect(Collectors.joining(",\n"));
+
+        return String.format(
+                """
+                        Você é um Especialista em Combinadas (Múltiplas) de Futebol.
+                        Recebi as seguintes análises individuais de IA para partidas de hoje:
+
+                        [
+                        %s
+                        ]
+
+                        SUA MISSÃO:
+                        Baseado nos dados acima, crie EXATAMENTE 4 sugestões de apostas múltiplas com os seguintes tamanhos:
+                        - Uma múltipla de 4 jogos (Mais Conservadora/Segura)
+                        - Uma múltipla de 6 jogos (Equilibrada)
+                        - Uma múltipla de 8 jogos (Arrojada)
+                        - Uma múltipla de 10 jogos (High Reward/Zebra Controlada)
+
+                        REGRAS:
+                        1. Selecione os melhores jogos para cada perfil.
+                        2. MERCADOS: Proibido Handicap. Varie entre Vencedor, Gols e Dupla Chance.
+                        3. Calcule a 'final_odd' multiplicando as odds individuais.
+                        4. Calcule a 'total_probability' baseada nas probabilidades individuais.
+                        5. IDIOMA: Português (Brasil).
+
+                        FORMATO DE SAÍDA:
+                        Retorne APENAS o JSON puro seguindo esta estrutura:
+                        {
+                          "multiples": [
+                            {
+                              "title": "Múltipla Segura (4 Jogos)",
+                              "size": 4,
+                              "legs": [
+                                { "id_fixture": 123, "team_a": "Time A", "team_b": "Time B", "game_date": "dd/MM HH:mm", "market": "Mercado", "odd": 1.50 }
+                              ],
+                              "final_odd": 8.50,
+                              "total_probability": 0.45
+                            }
+                          ]
+                        }
+                        """,
+                dataJson);
+    }
+
+    public static MultiBetResponse processMultiBetData(String aiResponseRaw, ObjectMapper objectMapper)
+            throws JsonProcessingException {
+        String raw = aiResponseRaw.replace("```json", "").replace("```", "").trim();
+        int firstBrace = raw.indexOf('{');
+        int lastBrace = raw.lastIndexOf('}');
+
+        if (firstBrace == -1 || lastBrace == -1) {
+            throw new com.fasterxml.jackson.databind.JsonMappingException(null, "JSON de múltiplas não encontrado");
+        }
+
+        String jsonStr = raw.substring(firstBrace, lastBrace + 1);
+        return objectMapper.readValue(jsonStr, MultiBetResponse.class);
+    }
+
+    public static String formatMultipleToText(MultiBetResponse.MultipleSuggestion multiple) {
+        StringBuilder sb = new StringBuilder();
+        sb.append(String.format("🔥 *%s*\n", multiple.getTitle()));
+
+        for (MultiBetResponse.BetLeg leg : multiple.getLegs()) {
+            sb.append(String.format("📍 %s | %s x %s\n", leg.getGameDate(), leg.getTeamA(), leg.getTeamB()));
+            sb.append(String.format("🎯 %s (@%.2f)\n\n", leg.getMarket(), leg.getOdd()));
+        }
+
+        sb.append(String.format("💰 *ODD FINAL: %.2f*\n", multiple.getFinalOdd()));
+        sb.append(String.format("📈 Probabilidade Estimada: %.1f%%\n", multiple.getTotalProbability() * 100));
+
+        return sb.toString();
     }
 
     public static String formatAnalysisToText(AnalysisData data, Fixture fixture) {
