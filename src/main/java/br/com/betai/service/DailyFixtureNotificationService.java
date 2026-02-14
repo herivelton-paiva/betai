@@ -25,6 +25,7 @@ public class DailyFixtureNotificationService {
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
     private static final double DEFAULT_BET = 5.0;
+    private static final java.util.Set<String> FINISHED_STATUSES = java.util.Set.of("FT", "AET", "PEN");
 
     @Value("${telegram.bot.token}")
     private String botToken;
@@ -88,6 +89,8 @@ public class DailyFixtureNotificationService {
         int totalGames = fixtures.size();
         long greens = 0;
         long reds = 0;
+        long aiGreens = 0;
+        long aiReds = 0;
         double totalProfit = 0;
 
         List<String> chunks = new ArrayList<>();
@@ -103,29 +106,37 @@ public class DailyFixtureNotificationService {
                 String time = fixture.getDate().toLocalTime().format(DateTimeFormatter.ofPattern("HH:mm"));
                 String matchLine;
 
-                boolean isFinished = "FT".equals(fixture.getStatusShort());
-                String resultIcon = getResultIcon(fixture);
+                boolean isFinished = FINISHED_STATUSES.contains(fixture.getStatusShort());
+                String apiIcon = getApiResultIcon(fixture);
+                String aiIcon = getAiResultIcon(fixture);
+                String combinedIcon = apiIcon + aiIcon;
 
                 double matchReturn = 0;
 
                 if (isFinished && fixture.getHomeTeamGoals() != null && fixture.getAwayTeamGoals() != null) {
                     double oddValue = getRelevantOdd(fixture);
-                    boolean isGreen = resultIcon.contains("✅");
+                    boolean isGreen = apiIcon.contains("✅");
 
                     if (isGreen) {
                         greens++;
                         matchReturn = DEFAULT_BET * (oddValue - 1);
                         totalProfit += matchReturn;
-                    } else if (resultIcon.contains("❌")) {
+                    } else if (apiIcon.contains("❌")) {
                         reds++;
                         matchReturn = -DEFAULT_BET;
                         totalProfit += matchReturn;
                     }
 
-                    matchLine = String.format("%s%s %d x %d %s - ⏰ %s\n", resultIcon, fixture.getHomeTeam(),
+                    if (aiIcon.contains("✅")) {
+                        aiGreens++;
+                    } else if (aiIcon.contains("❌")) {
+                        aiReds++;
+                    }
+
+                    matchLine = String.format("%s%s %d x %d %s - ⏰ %s\n", combinedIcon, fixture.getHomeTeam(),
                             fixture.getHomeTeamGoals(), fixture.getAwayTeamGoals(), fixture.getAwayTeam(), time);
                 } else {
-                    matchLine = String.format("%s%s x %s - ⏰ %s\n", resultIcon, fixture.getHomeTeam(),
+                    matchLine = String.format("%s%s x %s - ⏰ %s\n", combinedIcon, fixture.getHomeTeam(),
                             fixture.getAwayTeam(), time);
                 }
                 leagueChunk.append(matchLine);
@@ -142,19 +153,30 @@ public class DailyFixtureNotificationService {
 
         // Adicionar Resumo Estatístico
         long processed = greens + reds;
-        if (processed > 0) {
-            double winRate = (double) greens / processed * 100;
-            double lossRate = (double) reds / processed * 100;
+        long aiProcessed = aiGreens + aiReds;
 
+        if (processed > 0 || aiProcessed > 0) {
             StringBuilder summary = new StringBuilder();
             summary.append("\n📊 *RESUMO DO DIA*\n");
             summary.append("Total de Jogos: ").append(totalGames).append("\n");
-            summary.append("✅ Greens: ").append(greens).append("\n");
-            summary.append("❌ Reds: ").append(reds).append("\n");
-            summary.append(String.format("📈 Acertos: %.1f%%\n", winRate));
-            summary.append(String.format("📉 Falhas: %.1f%%\n", lossRate));
-            summary.append(
-                    String.format("💰 Saldo Total: %s R$ %.2f\n", totalProfit >= 0 ? "+" : "-", Math.abs(totalProfit)));
+
+            if (processed > 0) {
+                double winRate = (double) greens / processed * 100;
+                summary.append("\n*Previsões de Especialistas (API):*\n");
+                summary.append("✅ Greens: ").append(greens).append("\n");
+                summary.append("❌ Reds: ").append(reds).append("\n");
+                summary.append(String.format("📈 Acertos: %.1f%%\n", winRate));
+                summary.append(
+                        String.format("� Saldo: %s R$ %.2f\n", totalProfit >= 0 ? "+" : "-", Math.abs(totalProfit)));
+            }
+
+            if (aiProcessed > 0) {
+                double aiWinRate = (double) aiGreens / aiProcessed * 100;
+                summary.append("\n*Previsões de Inteligência Artificial (IA):*\n");
+                summary.append("✅ Greens: ").append(aiGreens).append("\n");
+                summary.append("❌ Reds: ").append(aiReds).append("\n");
+                summary.append(String.format("📈 Acertos: %.1f%%\n", aiWinRate));
+            }
 
             if (messageBuilder.length() + summary.length() > 4000) {
                 chunks.add(messageBuilder.toString());
@@ -172,10 +194,8 @@ public class DailyFixtureNotificationService {
         }
     }
 
-    private String getResultIcon(Fixture fixture) {
-        // Só exibe ícones (inclusive interrogação) se a partida tiver placar/estiver
-        // encerrada
-        if (!"FT".equals(fixture.getStatusShort()) || fixture.getHomeTeamGoals() == null
+    private String getApiResultIcon(Fixture fixture) {
+        if (!FINISHED_STATUSES.contains(fixture.getStatusShort()) || fixture.getHomeTeamGoals() == null
                 || fixture.getAwayTeamGoals() == null) {
             return "";
         }
@@ -183,10 +203,7 @@ public class DailyFixtureNotificationService {
         String winnerName = fixture.getWinningTeamName();
         String comment = fixture.getPredictionComment();
 
-        // Se não tem nada de previsão, retorna interrogação
         if (winnerName == null && comment == null) {
-            log.warn("Fixture encerrada sem nenhuma previsão (WinnerName e Comment nulos) - ID: {}, Partida: {} x {}",
-                    fixture.getId(), fixture.getHomeTeam(), fixture.getAwayTeam());
             return "❓ ";
         }
 
@@ -207,15 +224,83 @@ public class DailyFixtureNotificationService {
                     || lowerComment.contains("winner")) {
                 green = isWin;
             } else {
-                // Se o comentário existe mas não é claro, mas temos um vencedor, assume win
                 green = winnerName != null && isWin;
             }
         } else {
-            // Se só temos o nome do vencedor, assume que a aposta era nela
             green = isWin;
         }
 
         return green ? "✅ " : "❌ ";
+    }
+
+    private String getAiResultIcon(Fixture fixture) {
+        if (!FINISHED_STATUSES.contains(fixture.getStatusShort()) || fixture.getHomeTeamGoals() == null
+                || fixture.getAwayTeamGoals() == null || fixture.getIaAnalysis() == null) {
+            return "";
+        }
+
+        br.com.betai.domain.AnalysisData data = fixture.getIaAnalysis();
+        br.com.betai.domain.AnalysisData.WinnerNode aiWinner = data.getWinner();
+        boolean aiWinOrDraw = data.isWinOrDraw();
+
+        int homeGoals = fixture.getHomeTeamGoals();
+        int awayGoals = fixture.getAwayTeamGoals();
+        boolean isDraw = (homeGoals == awayGoals);
+
+        Long actualWinnerId = null;
+        if (homeGoals > awayGoals)
+            actualWinnerId = fixture.getHomeTeamId();
+        else if (awayGoals > homeGoals)
+            actualWinnerId = fixture.getAwayTeamId();
+
+        boolean green = false;
+        boolean hasPrediction = false;
+
+        if (aiWinOrDraw) {
+            hasPrediction = true;
+            if (aiWinner != null) {
+                green = isDraw || (actualWinnerId != null && actualWinnerId.equals(aiWinner.getId()));
+            } else {
+                green = isDraw;
+            }
+        } else if (aiWinner != null) {
+            hasPrediction = true;
+            green = (actualWinnerId != null && actualWinnerId.equals(aiWinner.getId()));
+        } else {
+            br.com.betai.domain.AnalysisData.GoalsMarket gm = data.getGoalsMarket();
+            if (gm != null && gm.getTarget() != null && gm.getOdd() > 0) {
+                hasPrediction = true;
+                int totalGoals = homeGoals + awayGoals;
+                String target = gm.getTarget().toLowerCase();
+                if (target.contains("mais de") || target.contains("over")) {
+                    double val = parseThreshold(target);
+                    green = totalGoals > val;
+                } else if (target.contains("menos de") || target.contains("under")) {
+                    double val = parseThreshold(target);
+                    green = totalGoals < val;
+                } else if (target.contains("ambas") || target.contains("both")) {
+                    green = homeGoals > 0 && awayGoals > 0;
+                } else {
+                    hasPrediction = false;
+                }
+            }
+        }
+
+        if (!hasPrediction)
+            return "";
+        return green ? "✅ " : "❌ ";
+    }
+
+    private double parseThreshold(String text) {
+        try {
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("[0-9]+(\\.[0-9]+)?").matcher(text);
+            if (m.find()) {
+                return Double.parseDouble(m.group());
+            }
+        } catch (Exception e) {
+            log.warn("Erro ao extrair valor de threshold: {}", text);
+        }
+        return 0.0;
     }
 
     private double getRelevantOdd(Fixture fixture) {

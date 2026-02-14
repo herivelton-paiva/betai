@@ -172,19 +172,23 @@ public class DynamoDBService {
         // Goals / Score
         if (fixtureMap.containsKey("goals")) {
             Map<String, AttributeValue> goals = fixtureMap.get("goals").m();
-            if (goals.containsKey("home") && goals.get("home").n() != null) {
-                builder.homeTeamGoals(Integer.valueOf(goals.get("home").n()));
-            }
-            if (goals.containsKey("away") && goals.get("away").n() != null) {
-                builder.awayTeamGoals(Integer.valueOf(goals.get("away").n()));
-            }
-        } else if (fixtureMap.containsKey("score")) {
+            builder.homeTeamGoals(parseInteger(goals.get("home")));
+            builder.awayTeamGoals(parseInteger(goals.get("away")));
+        }
+
+        // If goals are still null, try 'score' map
+        if (builder.build().getHomeTeamGoals() == null && fixtureMap.containsKey("score")) {
             Map<String, AttributeValue> score = fixtureMap.get("score").m();
-            if (score.containsKey("home") && score.get("home").n() != null) {
-                builder.homeTeamGoals(Integer.valueOf(score.get("home").n()));
-            }
-            if (score.containsKey("away") && score.get("away").n() != null) {
-                builder.awayTeamGoals(Integer.valueOf(score.get("away").n()));
+
+            // Try direct home/away
+            builder.homeTeamGoals(parseInteger(score.get("home")));
+            builder.awayTeamGoals(parseInteger(score.get("away")));
+
+            // If still null, try 'fulltime' sub-map
+            if (builder.build().getHomeTeamGoals() == null && score.containsKey("fulltime")) {
+                Map<String, AttributeValue> ft = score.get("fulltime").m();
+                builder.homeTeamGoals(parseInteger(ft.get("home")));
+                builder.awayTeamGoals(parseInteger(ft.get("away")));
             }
         }
 
@@ -273,5 +277,20 @@ public class DynamoDBService {
                 return AttributeValue.builder().s(String.valueOf(data)).build();
             }
         }
+    }
+
+    private Integer parseInteger(AttributeValue v) {
+        if (v == null || v.nul() != null && v.nul())
+            return null;
+        if (v.n() != null)
+            return Integer.valueOf(v.n());
+        if (v.s() != null) {
+            try {
+                return Integer.valueOf(v.s());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 }

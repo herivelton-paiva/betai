@@ -33,34 +33,31 @@ public class AnalysisUtils {
         return String.format(
                 """
                         Você é um Analista de Apostas e Cientista de Dados especializado em futebol.
-                        Sua tarefa: Gerar uma análise técnica em JSON para o jogo %s x %s (%s) em %s.
+                        Sua tarefa: Gerar uma análise técnica INDEPENDENTE em JSON para o jogo %s x %s (%s) em %s.
 
                         --- CONTEXTO E ODDS ---
                         %s
                         --- ESTATÍSTICAS ---
                         %s
-                        --- MODELOS DE REFERÊNCIA ---
+                        --- MODELOS DE REFERÊNCIA (APENAS APOIO) ---
                         %s
 
-                        REGRAS DE OURO:
-                        1. CONTEXTO CRÍTICO: Use a ferramenta de busca (Search) para verificar se o jogo é ELIMINATÓRIO (Mata-mata) ou se há TIMES RESERVAS. Isso deve ter peso de 80%% na sua decisão.
-                        2. MERCADOS PERMITIDOS:
+                        REGRAS DE OURO PARA EVITAR VIÉS:
+                        1. INDEPENDÊNCIA E NOTÍCIAS (CRÍTICO): NÃO siga cegamente os 'MODELOS DE REFERÊNCIA'. Use a ferramenta de busca (Search) para encontrar notícias reais das últimas 24h: desfalques (lesões/suspensões), mudanças de técnico, salários atrasados, ou se o time escalará reservas devido a outras competições.
+                        2. CENÁRIO DE PRESSÃO E MOTIVAÇÃO: Avalie o peso da partida. É um clássico? Vale vaga em libertadores/rebaixamento? É um jogo de 'cumprir tabela'? O técnico está ameaçado? O fator psicológico e a motivação devem pesar 50%% na sua análise.
+                        3. MERCADOS PERMITIDOS:
                            - Vitoria do [Nome do Time]
                            - Gols Over/Under (Ex: Mais de 2.5 Gols)
                            - Ambas Marcam (Ex: Ambas Marcam: Sim)
                            - Empate Anula: [Nome do Time]
                            - Vencedor 1º Tempo: [Nome do Time]
                            - Dupla Chance: [Sugestão] (Ex: Dupla Chance: Corinthians ou Empate)
-                        3. ESTRATÉGIA DE SEGURANÇA (CRÍTICO):
+                        4. ESTRATÉGIA DE SEGURANÇA:
                            - EQUILÍBRIO: Se a diferença de probabilidade entre Vitória Casa e Fora for menor que 15%%, você DEVE preferir mercados de proteção como "Dupla Chance" ou "Empate Anula".
-                           - VALOR: Procure o melhor EV+.
-                        4. PROIBIÇÃO DE ZEROS: Os campos 'odd_bookmaker' e 'probability_ai' NUNCA podem ser 0.00. Extraia a odd da seção 'ODDS ATUAIS' ou estime uma odd realista baseada no mercado.
-                        5. CONSISTÊNCIA: A 'probability_ai' DEVE ser a soma das probabilidades individuais do mercado (Ex: Dupla Chance = win + draw).
-                        6. NÍVEL DE CONFIANÇA (confidence_level):
-                           - ALTO: Probabilidade sugerida > 70%% OU forte evidência estatística e contexto claro.
-                           - MEDIO: Probabilidade entre 50%% e 70%% OU contexto com algumas incertezas.
-                           - BAIXO: Jogos muito equilibrados, mata-mata volátil ou dúvidas sobre escalação reserva.
-                        7. FORMATO: JSON puro. NADA de preâmbulos ou markdown. Idioma: Português (Brasil).
+                        5. PROIBIÇÃO DE ZEROS: Os campos 'odd_bookmaker' e 'probability_ai' NUNCA podem ser 0.00.
+                        6. CONSISTÊNCIA: A 'probability_ai' DEVE ser a soma das probabilidades individuais do mercado.
+                        7. NÍVEL DE CONFIANÇA: Baseie-se no cruzamento entre estatística (histórico) e notícias (momento atual). Se as notícias contradizem a estatística, o 'momento atual' vence.
+                        8. FORMATO: JSON puro. NADA de preâmbulos ou markdown. Idioma: Português (Brasil).
 
                         ESTRUTURA OBRIGATÓRIA (JSON):
                         {
@@ -69,7 +66,7 @@ public class AnalysisUtils {
                             "market": "Vitoria do [Nome do Time]",
                             "odd_bookmaker": 1.95,
                             "probability_ai": 0.55,
-                            "justification": "justificativa curta aqui, indicar se tiver escalacao reserva"
+                            "justification": "justificativa detalhada focando em motivação, desfalques e notícias recentes"
                         },
                         "goals_market": { "target": "Mais de 1.5 Gols", "odd": 1.80 },
                         "probabilities": { "home_win": 0.55, "draw": 0.25, "away_win": 0.20, "confidence_level": "ALTO" },
@@ -253,11 +250,9 @@ public class AnalysisUtils {
                         ]
 
                         SUA MISSÃO:
-                        Baseado nos dados acima, crie EXATAMENTE 4 sugestões de apostas múltiplas com os seguintes tamanhos:
-                        - Uma múltipla de 4 jogos (Mais Conservadora/Segura)
-                        - Uma múltipla de 6 jogos (Equilibrada)
-                        - Uma múltipla de 8 jogos (Arrojada)
-                        - Uma múltipla de 10 jogos (High Reward/Zebra Controlada)
+                        Baseado nos dados acima, crie EXATAMENTE 2 sugestões de apostas múltiplas:
+                        1. Múltipla Cautelosa (4 Jogos): Foque em jogos com maior probabilidade (prob > 0.70) e odds mais seguras.
+                        2. Múltipla Agressiva (5 Jogos): Busque maior retorno, podendo incluir odds mais altas e mercados mais ousados.
 
                         REGRAS:
                         1. Selecione os melhores jogos para cada perfil.
@@ -271,13 +266,22 @@ public class AnalysisUtils {
                         {
                           "multiples": [
                             {
-                              "title": "Múltipla Segura (4 Jogos)",
+                              "title": "Múltipla Cautelosa (4 Jogos)",
                               "size": 4,
                               "legs": [
                                 { "id_fixture": 123, "team_a": "Time A", "team_b": "Time B", "game_date": "dd/MM HH:mm", "market": "Mercado", "odd": 1.50 }
                               ],
-                              "final_odd": 8.50,
-                              "total_probability": 0.45
+                              "final_odd": 5.50,
+                              "total_probability": 0.35
+                            },
+                            {
+                              "title": "Múltipla Agressiva (5 Jogos)",
+                              "size": 5,
+                              "legs": [
+                                { "id_fixture": 456, "team_a": "Time C", "team_b": "Time D", "game_date": "dd/MM HH:mm", "market": "Mercado", "odd": 2.10 }
+                              ],
+                              "final_odd": 15.80,
+                              "total_probability": 0.15
                             }
                           ]
                         }
@@ -362,23 +366,23 @@ public class AnalysisUtils {
                 ? fixture.getDate().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"))
                 : "--/--/---- --:--";
 
-        var oddStr = data.getBetSuggestion().getOddBookmaker() > 0
+        var mainOddStr = data.getBetSuggestion().getOddBookmaker() > 0
                 ? String.format("%.2f", data.getBetSuggestion().getOddBookmaker())
-                : "Indisponível";
+                : "?.??";
+
+        var goalsOddStr = data.getGoalsMarket().getOdd() > 0 ? String.format("%.2f", data.getGoalsMarket().getOdd())
+                : "?.??";
 
         return String.format("""
                 🎯 SUGESTÃO DE APOSTA (%s x %s - %s)
-                *✅ Mercado:* %s
-                *🎲 Probabilidade da Sugestão:* %.0f%%
-                *💰 Odd Betano:* %s
-                *🔥 Mercado de Gols:* %s (%.2f)
-                *📊 Probabilidades:* %s: %.0f%% | Empate: %.0f%% | %s: %.0f%%
-                *📈 Nível de Confiança:* %s""", fixture.getHomeTeam(), fixture.getAwayTeam(), gameTime,
-                data.getBetSuggestion().getMarket(), data.getBetSuggestion().getProbabilityAi() * 100, oddStr,
-                data.getGoalsMarket().getTarget(), data.getGoalsMarket().getOdd(), fixture.getHomeTeam(),
+                🎲 Probabilidade da Sugestão: %.0f%%
+                ✅ Mercado: %s (%s)
+                ⚽ Mercado de Gols: %s (%s)
+                📊 Probabilidades: Casa: %.0f%% | Empate: %.0f%% | Fora: %.0f%%""", fixture.getHomeTeam(),
+                fixture.getAwayTeam(), gameTime, data.getBetSuggestion().getProbabilityAi() * 100,
+                data.getBetSuggestion().getMarket(), mainOddStr, data.getGoalsMarket().getTarget(), goalsOddStr,
                 data.getProbabilities().getHomeWin() * 100, data.getProbabilities().getDraw() * 100,
-                fixture.getAwayTeam(), data.getProbabilities().getAwayWin() * 100,
-                data.getProbabilities().getConfidenceLevel());
+                data.getProbabilities().getAwayWin() * 100);
     }
 
     /**
