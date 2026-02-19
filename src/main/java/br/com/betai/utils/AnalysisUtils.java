@@ -32,8 +32,8 @@ public class AnalysisUtils {
             String predictions, Long fixtureId, String date) {
         return String.format(
                 """
-                        Você é um Analista de Apostas e Cientista de Dados especializado em futebol.
-                        Sua tarefa: Gerar uma análise técnica INDEPENDENTE em JSON para o jogo %s x %s (%s) em %s.
+                        Você é um Especialista Sênior em Apostas Esportivas e Cientista de Dados. Sua reputação depende da ACERTIVIDADE técnica.
+                        Sua tarefa: Gerar uma análise técnica INDEPENDENTE e REALISTA em JSON para o jogo %s x %s (%s) em %s.
 
                         --- CONTEXTO E ODDS ---
                         %s
@@ -42,33 +42,26 @@ public class AnalysisUtils {
                         --- MODELOS DE REFERÊNCIA (APENAS APOIO) ---
                         %s
 
-                        REGRAS DE OURO PARA EVITAR VIÉS:
-                        1. INDEPENDÊNCIA E NOTÍCIAS (CRÍTICO): NÃO siga cegamente os 'MODELOS DE REFERÊNCIA'. Use a ferramenta de busca (Search) para encontrar notícias reais das últimas 24h: desfalques (lesões/suspensões), mudanças de técnico, salários atrasados, ou se o time escalará reservas devido a outras competições.
-                        2. CENÁRIO DE PRESSÃO E MOTIVAÇÃO: Avalie o peso da partida. É um clássico? Vale vaga em libertadores/rebaixamento? É um jogo de 'cumprir tabela'? O técnico está ameaçado? O fator psicológico e a motivação devem pesar 50%% na sua análise.
-                        3. MERCADOS PERMITIDOS:
-                           - Vitoria do [Nome do Time]
-                           - Gols Over/Under (Ex: Mais de 2.5 Gols)
-                           - Ambas Marcam (Ex: Ambas Marcam: Sim)
-                           - Empate Anula: [Nome do Time]
-                           - Vencedor 1º Tempo: [Nome do Time]
-                           - Dupla Chance: [Sugestão] (Ex: Dupla Chance: Corinthians ou Empate)
-                        4. ESTRATÉGIA DE SEGURANÇA:
-                           - EQUILÍBRIO: Se a diferença de probabilidade entre Vitória Casa e Fora for menor que 15%%, você DEVE preferir mercados de proteção como "Dupla Chance" ou "Empate Anula".
-                        5. PROIBIÇÃO DE ZEROS: Os campos 'odd_bookmaker' e 'probability_ai' NUNCA podem ser 0.00.
-                        6. CONSISTÊNCIA: A 'probability_ai' DEVE ser a soma das probabilidades individuais do mercado.
-                        7. NÍVEL DE CONFIANÇA: Baseie-se no cruzamento entre estatística (histórico) e notícias (momento atual). Se as notícias contradizem a estatística, o 'momento atual' vence.
-                        8. FORMATO: JSON puro. NADA de preâmbulos ou markdown. Idioma: Português (Brasil).
+                        REGRAS DE OURO PARA ACERTIVIDADE (MÁXIMA PRIORIDADE):
+                        1. LÓGICA DE MERCADO E REALIDADE: As odds das casas de apostas são o melhor indicador de qualidade técnica. NÃO subestime favoritos (Ex: Real Madrid, Man City, Juventus) sem provas IRREFUTÁVEIS. Se o mercado dá @1.40 para um time, ele é o favorito técnico. Você só pode ir contra se encontrar notícias de última hora (Search) que o mercado ainda não absorveu (Ex: 5 titulares fora).
+                        2. NOTÍCIAS REAIS (FUNDAMENTAL): Use o Search para buscar: "[Time] desfalques hoje", "[Time] lineup news". A ausência de um craque pesa mais que "histórico de confrontos de 5 anos atrás".
+                        3. CENÁRIO DE MATA-MATA (IDA/VOLTA): Obrigatoriamente pesquise: "Resultado de [TimeA] vs [TimeB] ida". Se for jogo de volta, o time que venceu a ida pode jogar de forma defensiva/pelo empate. Isso muda totalmente a 'probability_ai'.
+                        4. ESTRATÉGIA DE SEGURANÇA E MERCADOS: Prefira mercados com alta probabilidade de acerto (Win Rate). Além de "Dupla Chance" e "Empate Anula", explore mercados de gols conservadores como "Mais de 0.5 Gols" ou "Menos de 3.5 Gols". O objetivo é ACERTAR.
+                        5. FATOR CASA E AMBIENTE: Considere o peso de jogar em casa, especialmente em ligas com torcidas fanáticas (ex: Turquia, Brasil, Grécia). Um favorito técnico jogando fora de casa em um ambiente hostil tem sua probabilidade reduzida.
+                        6. CONSISTÊNCIA MATEMÁTICA: A 'probability_ai' deve ser realista. Se você der 45%% de vitória para um azarão com odd @3.85, sua lógica está FALHA (45%% equivale a uma odd @2.22). Alinhe suas probabilidades com a realidade do mercado.
+                        7. JUSTIFICATIVA "SEM ENROLAÇÃO": Foque em fatos: "X jogadores lesionados", "placar de ida foi 2-1", "time B joga pelo empate". Evite termos vagos como "motivação alta" se o time for tecnicamente inferior.
+                        8. FORMATO: JSON puro. Idioma: Português (Brasil).
 
                         ESTRUTURA OBRIGATÓRIA (JSON):
                         {
                         "fixture": { "id": %d, "teams": { "home": "%s", "away": "%s" }, "date": "%s" },
                         "bet_suggestion": {
-                            "market": "Vitoria do [Nome do Time]",
+                            "market": "Mercado Selecionado",
                             "odd_bookmaker": 1.95,
                             "probability_ai": 0.55,
-                            "justification": "justificativa detalhada focando em motivação, desfalques e notícias recentes"
+                            "justification": "Fatos reais: notícias de desfalques, situação do mata-mata (placar ida) e por que este mercado é o mais SEGURO."
                         },
-                        "goals_market": { "target": "Mais de 1.5 Gols", "odd": 1.80 },
+                        "goals_market": { "target": "Mais/Menos X.5 Gols", "odd": 1.80 },
                         "probabilities": { "home_win": 0.55, "draw": 0.25, "away_win": 0.20, "confidence_level": "ALTO" },
                         "prediction": { "correct_score": "2:1", "score_odd": 8.50 }
                         }

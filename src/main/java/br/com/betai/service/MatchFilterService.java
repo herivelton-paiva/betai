@@ -4,6 +4,7 @@ import br.com.betai.domain.Fixture;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import br.com.betai.domain.AnalysisData;
 import br.com.betai.domain.AnalysisContextDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,11 +47,9 @@ public class MatchFilterService {
             if (fixture == null)
                 return false;
 
-            // Só processar jogos que NÃO iniciaram (Status: NS)
-            if (!"NS".equals(fixture.getStatusShort())) {
-                System.out.println(String.format(
-                        "⏭️ [PULANDO] %s x %s | ID: %d | Motivo: Jogo já iniciado ou finalizado (Status: %s)",
-                        fixture.getHomeTeam(), fixture.getAwayTeam(), fixture.getId(), fixture.getStatusShort()));
+            // Só processar jogos nos status autorizados (NS, AET, 1H, HT, PEN)
+            String status = fixture.getStatusShort();
+            if (!java.util.Set.of("NS", "AET", "1H", "HT", "PEN", "PST").contains(status)) {
                 return false;
             }
             return true;
@@ -90,12 +89,39 @@ public class MatchFilterService {
         int oportunidades = 0;
         int descartados = 0;
 
+        // Ordenar os itens por data do jogo
+        items.sort((a, b) -> {
+            try {
+                String dateA = a.get("fixture").m().get("date").s();
+                String dateB = b.get("fixture").m().get("date").s();
+                return dateA.compareTo(dateB);
+            } catch (Exception e) {
+                return 0;
+            }
+        });
+
         for (Map<String, AttributeValue> item : items) {
             Fixture fixture = dynamoDBService.mapToFixture(item);
 
             if (item.containsKey("iaAnalysis")) {
-                System.out.println(String.format("⏭️ [PULANDO] %s x %s | ID: %d | Motivo: Já analisado",
-                        fixture.getHomeTeam(), fixture.getAwayTeam(), fixture.getId()));
+                AnalysisData data = fixture.getIaAnalysis();
+                if (data != null && data.getBetSuggestion() != null && data.getProbabilities() != null) {
+                    System.out.println(String.format("""
+                            ⏭️ [JÁ ANALISADO] %s x %s | ID: %d
+                            ✅ Mercado: %s (%.2f)
+                            ⚽ Mercado de Gols: %s (%.2f)
+                            📊 Probabilidades: Casa: %.0f%% | Empate: %.0f%% | Fora: %.0f%%
+                            📝 Justificativa: %s
+                            """, fixture.getHomeTeam(), fixture.getAwayTeam(), fixture.getId(),
+                            data.getBetSuggestion().getMarket(), data.getBetSuggestion().getOddBookmaker(),
+                            data.getGoalsMarket() != null ? data.getGoalsMarket().getTarget() : "N/A",
+                            data.getGoalsMarket() != null ? data.getGoalsMarket().getOdd() : 0.0,
+                            data.getProbabilities().getHomeWin() * 100, data.getProbabilities().getDraw() * 100,
+                            data.getProbabilities().getAwayWin() * 100, data.getBetSuggestion().getJustification()));
+                } else {
+                    System.out.println(String.format("⏭️ [PULANDO] %s x %s | ID: %d | Motivo: Já analisado",
+                            fixture.getHomeTeam(), fixture.getAwayTeam(), fixture.getId()));
+                }
                 continue;
             }
 
