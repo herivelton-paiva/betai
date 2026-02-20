@@ -17,14 +17,14 @@ public class FixtureAnalysisScheduler {
     }
 
     /**
-     * Roda a cada 30 minutos para analisar jogos que começam em até 2 horas. Cron:
+     * Roda a cada 30 minutos para analisar jogos que começam em até 4 horas. Cron:
      * Segundo Minuto Hora DiaMes Mes DiaSemana
      */
     @Scheduled(cron = "0 0/30 * * * *")
     public void scheduleUpcomingMatchesAnalysis() {
         log.info("Executando análise agendada de jogos próximos (30 min check)...");
         try {
-            matchFilterService.filtrarOportunidadesProximasDuasHoras();
+            matchFilterService.filtrarOportunidadesProximasQuatroHoras();
         } catch (Exception e) {
             log.error("Erro na execução do scheduler de análise: {}", e.getMessage());
         }
