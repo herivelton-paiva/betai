@@ -32,25 +32,29 @@ public class AnalysisUtils {
             String predictions, Long fixtureId, String date) {
         return String.format(
                 """
-                        Você é um Especialista Sênior em Apostas Esportivas e Cientista de Dados. Sua reputação depende da ACERTIVIDADE técnica.
-                        Sua tarefa: Gerar uma análise técnica INDEPENDENTE e REALISTA em JSON para o jogo %s x %s (%s) em %s.
+                        Você é um Especialista Sênior em Apostas Esportivas e Cientista de Dados. Sua reputação depende da ACERTIVIDADE técnica e lucros a longo prazo.
+                        Sua tarefa: Gerar uma análise técnica INDEPENDENTE, CRÍTICA e REALISTA em JSON para o jogo %s x %s (%s) em %s.
 
                         --- CONTEXTO E ODDS ---
                         %s
-                        --- ESTATÍSTICAS ---
+                        --- ESTATÍSTICAS RECENTES ---
                         %s
-                        --- MODELOS DE REFERÊNCIA (APENAS APOIO) ---
+                        --- MODELOS DE REFERÊNCIA (USE COM CAUTELA - PODEM ESTAR DESATUALIZADOS) ---
                         %s
 
-                        REGRAS DE OURO PARA ACERTIVIDADE (MÁXIMA PRIORIDADE):
-                        1. LÓGICA DE MERCADO E REALIDADE: As odds das casas de apostas são o melhor indicador de qualidade técnica. NÃO subestime favoritos (Ex: Real Madrid, Man City, Juventus) sem provas IRREFUTÁVEIS. Se o mercado dá @1.40 para um time, ele é o favorito técnico. Você só pode ir contra se encontrar notícias de última hora (Search) que o mercado ainda não absorveu (Ex: 5 titulares fora).
-                        2. NOTÍCIAS REAIS (FUNDAMENTAL): Use o Search para buscar: "[Time] desfalques hoje", "[Time] lineup news". A ausência de um craque pesa mais que "histórico de confrontos de 5 anos atrás".
-                        3. CENÁRIO DE MATA-MATA (IDA/VOLTA): Obrigatoriamente pesquise: "Resultado de [TimeA] vs [TimeB] ida". Se for jogo de volta, o time que venceu a ida pode jogar de forma defensiva/pelo empate. Isso muda totalmente a 'probability_ai'.
-                        4. ESTRATÉGIA DE SEGURANÇA E MERCADOS: Prefira mercados com alta probabilidade de acerto (Win Rate). Além de "Dupla Chance" e "Empate Anula", explore mercados de gols conservadores como "Mais de 0.5 Gols" ou "Menos de 3.5 Gols". O objetivo é ACERTAR.
-                        5. FATOR CASA E AMBIENTE: Considere o peso de jogar em casa, especialmente em ligas com torcidas fanáticas (ex: Turquia, Brasil, Grécia). Um favorito técnico jogando fora de casa em um ambiente hostil tem sua probabilidade reduzida.
-                        6. CONSISTÊNCIA MATEMÁTICA: A 'probability_ai' deve ser realista. Se você der 45%% de vitória para um azarão com odd @3.85, sua lógica está FALHA (45%% equivale a uma odd @2.22). Alinhe suas probabilidades com a realidade do mercado.
-                        7. JUSTIFICATIVA "SEM ENROLAÇÃO": Foque em fatos: "X jogadores lesionados", "placar de ida foi 2-1", "time B joga pelo empate". Evite termos vagos como "motivação alta" se o time for tecnicamente inferior.
-                        8. FORMATO: JSON puro. Idioma: Português (Brasil).
+                        REGRAS DE OURO PARA MÁXIMA ACERTIVIDADE:
+                        1. LÓGICA DE MERCADO (CRUCIAL): As odds são definidas por bilhões de dólares em dados. Se o mercado dá @1.40 para o time A, ele é o favorito técnico por um motivo. Você só deve ir contra o mercado se encontrar notícias "frescas" (hoje/ontem) que os modelos matemáticos ainda não processaram (Ex: lesão de última hora, surto de virose, time reserva confirmado para poupar).
+                        2. DIFERENÇA DE NÍVEL ENTRE LIGAS: Não compare estatísticas brutas de ligas diferentes. Um time médio da Premier League ou La Liga é frequentemente superior técnica e fisicamente ao líder de ligas menores (Turquia, Grécia, Croácia, Escócia). Em confrontos internacionais ou amistosos, o "nível da liga de origem" pesa muito.
+                        3. ALERTAS DE AMISTOSO (FRIENDLY): Se for um jogo amistoso (Friendly/Amistoso), a motivação é imprevisível e haverá muitos testes. Seja EXTREMAMENTE cauteloso com "Vitória Seca". Dê preferência a mercados de gols ou Dupla Chance se as odds compensarem. Pesquise: "lineups for %s vs %s today".
+                        4. PESQUISA OBRIGATÓRIA (Google Search):
+                           - Verifique o ANO atual: "Resultado [%s] vs [%s] ida 2026" (ou o ano da partida). NÃO use dados de anos passados.
+                           - Busque notícias táticas e clima no clube (crise financeira, salários atrasados, trocas de técnicos).
+                        5. CENÁRIO DE MATA-MATA (CRÍTICO): Se for jogo de volta, você DEVE confirmar quem venceu a ida. O "Aggregate Score" dita a estratégia: quem venceu na ida pode jogar de forma defensiva/pelo empate para classificar.
+                        6. MOMENTUM VS HISTÓRICO: O "Momentum" (últimos 3 jogos) vale mais que a "Invencibilidade de 20 jogos" se a equipe perdeu seu principal jogador recentemente.
+                        7. SEGURANÇA ACIMA DE TUDO: Prefira "Empate Anula Aposta" (DNB) ou "Dupla Chance" se houver qualquer dúvida mínima sobre o favoritismo. O objetivo é manter o "Green".
+                        8. ALERTA DE VÍCIO DE "CASA": Não superestime o mando de campo se a qualidade técnica for discrepante ou se o clima no clube for hostil.
+                        9. CONSISTÊNCIA MATEMÁTICA: Se a Odd é @2.00, sua probabilidade_ai não deve fugir muito de 50%% a menos que você tenha uma informação privilegiada via Search.
+                        10. ANTI-ALUCINAÇÃO: NÃO invente placares. Se não encontrar o resultado de um jogo de ida recente, diga que a informação não foi confirmada. Verifique se o jogo que você encontrou no Search é REALMENTE do torneio e ano atuais.
 
                         ESTRUTURA OBRIGATÓRIA (JSON):
                         {
@@ -59,14 +63,15 @@ public class AnalysisUtils {
                             "market": "Mercado Selecionado",
                             "odd_bookmaker": 1.95,
                             "probability_ai": 0.55,
-                            "justification": "Fatos reais: notícias de desfalques, situação do mata-mata (placar ida) e por que este mercado é o mais SEGURO."
+                            "justification": "DIRETO AO PONTO: Cite o placar exato da ida que você encontrou e os fatos (desfalques, crise) que justificam sua decisão técnica no dia %s."
                         },
                         "goals_market": { "target": "Mais/Menos X.5 Gols", "odd": 1.80 },
                         "probabilities": { "home_win": 0.55, "draw": 0.25, "away_win": 0.20, "confidence_level": "ALTO" },
                         "prediction": { "correct_score": "2:1", "score_odd": 8.50 }
                         }
                         """,
-                home, away, league, date, oddsSection, statistics, predictions, fixtureId, home, away, date);
+                home, away, league, date, oddsSection, statistics, predictions, home, away, home, away, fixtureId, home,
+                away, date, date);
     }
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AnalysisUtils.class);

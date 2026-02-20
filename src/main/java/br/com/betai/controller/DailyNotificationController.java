@@ -17,7 +17,7 @@ public class DailyNotificationController {
 
     @GetMapping("/test")
     public String triggerTest() {
-        dailyFixtureNotificationService.sendDailyFixtures();
+        dailyFixtureNotificationService.sendBeforeDayFixtures();
         return "Processo de notificação diária disparado com sucesso!";
     }
 }

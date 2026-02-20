@@ -23,7 +23,7 @@ import java.util.Map;
 public class GeminiAnalysisService {
 
     private static final Logger log = LoggerFactory.getLogger(GeminiAnalysisService.class);
-    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent";
+    private static final String GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
     private final RestTemplate restTemplate;
     private final DynamoDBService dynamoDBService;
@@ -45,15 +45,8 @@ public class GeminiAnalysisService {
                 return "⚠️ Não foi possível obter análise detalhada do Gemini";
             }
 
-            if ("POSITIVE".equals(analysis.getBetSuggestion().getStatusEv())
-                    && analysis.getBetSuggestion().getOddBookmaker() > 0) {
-                log.info("Análise com valor encontrada para partida {}. Retornando resultado...", fixture.getId());
-                return AnalysisUtils.formatAnalysisToText(analysis, fixture);
-            } else {
-                log.info("Análise da partida {} descartada para exibição por falta de EV positivo (Calculado: {})",
-                        fixture.getId(), String.format("%.2f", analysis.getBetSuggestion().getExpectedValue()));
-                return "⚪ Análise descartada: Valor esperado (EV) negativo.";
-            }
+            log.info("Análise com valor encontrada para partida {}. Retornando resultado...", fixture.getId());
+            return AnalysisUtils.formatAnalysisToText(analysis, fixture);
         } catch (Exception e) {
             log.error("Falha final na análise após retries para partida {}: {}", fixture.getId(), e.getMessage());
             return "⚠️ Erro crítico na análise do Gemini após múltiplas tentativas.";
@@ -71,13 +64,13 @@ public class GeminiAnalysisService {
         String prompt = AnalysisUtils.buildDetailedAnalysisPrompt(fixture, statistics, predictions);
         String url = GEMINI_API_URL + "?key=" + apiKey;
 
-        log.info("Iniciando tentativa de análise Gemini para partida {}...", fixture.getId());
+        log.info("Iniciando tentativa de análise Gemini (v2.0 Flash) para partida {}...", fixture.getId());
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         Map<String, Object> requestBody = Map.of("contents", List.of(Map.of("parts", List.of(Map.of("text", prompt)))),
-                "tools", List.of(Map.of("google_search", Map.of())));
+                "tools", List.of(Map.of("google_search", Map.of())), "generationConfig", Map.of("temperature", 0.1));
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
         GeminiResponse response = restTemplate.postForObject(url, request, GeminiResponse.class);

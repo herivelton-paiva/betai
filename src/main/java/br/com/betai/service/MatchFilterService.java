@@ -61,12 +61,12 @@ public class MatchFilterService {
     /**
      * Filtra e envia para análise jogos que começam em até 2 horas.
      */
-    public void filtrarOportunidadesProximasDuasHoras() {
+    public void filtrarOportunidadesProximasQuatroHoras() {
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime twoHoursFromNow = now.plus(2, ChronoUnit.HOURS);
+        LocalDateTime fourHoursFromNow = now.plus(4, ChronoUnit.HOURS);
         LocalDate today = LocalDate.now();
 
-        log.info("--- Iniciando Filtragem de Próximos Jogos (Próximas 2h: {} até {}) ---", now, twoHoursFromNow);
+        log.info("--- Iniciando Filtragem de Próximos Jogos (Próximas 4h: {} até {}) ---", now, fourHoursFromNow);
 
         List<Map<String, AttributeValue>> items = dynamoDBService.getFixturesByDate(today);
 
@@ -75,9 +75,9 @@ public class MatchFilterService {
             if (fixture == null || fixture.getDate() == null)
                 return false;
 
-            // Filtro: Não iniciado AND Horário entre Agora e +2h
+            // Filtro: Não iniciado AND Horário entre Agora e +4h
             boolean isNS = "NS".equals(fixture.getStatusShort());
-            boolean startsSoon = fixture.getDate().isAfter(now) && fixture.getDate().isBefore(twoHoursFromNow);
+            boolean startsSoon = fixture.getDate().isAfter(now) && fixture.getDate().isBefore(fourHoursFromNow);
 
             return isNS && startsSoon;
         }).collect(Collectors.toList());
@@ -107,17 +107,20 @@ public class MatchFilterService {
                 AnalysisData data = fixture.getIaAnalysis();
                 if (data != null && data.getBetSuggestion() != null && data.getProbabilities() != null) {
                     System.out.println(String.format("""
-                            ⏭️ [JÁ ANALISADO] %s x %s | ID: %d
+                            ⏭️  %s - %s x %s | ID: %d
                             ✅ Mercado: %s (%.2f)
                             ⚽ Mercado de Gols: %s (%.2f)
                             📊 Probabilidades: Casa: %.0f%% | Empate: %.0f%% | Fora: %.0f%%
-                            📝 Justificativa: %s
-                            """, fixture.getHomeTeam(), fixture.getAwayTeam(), fixture.getId(),
+                            🤖 Previsão API: %s
+                            📝 Previsão IA: %s
+                            """, fixture.getLeagueName(), fixture.getHomeTeam(), fixture.getAwayTeam(), fixture.getId(),
                             data.getBetSuggestion().getMarket(), data.getBetSuggestion().getOddBookmaker(),
                             data.getGoalsMarket() != null ? data.getGoalsMarket().getTarget() : "N/A",
                             data.getGoalsMarket() != null ? data.getGoalsMarket().getOdd() : 0.0,
                             data.getProbabilities().getHomeWin() * 100, data.getProbabilities().getDraw() * 100,
-                            data.getProbabilities().getAwayWin() * 100, data.getBetSuggestion().getJustification()));
+                            data.getProbabilities().getAwayWin() * 100,
+                            fixture.getPredictionComment() != null ? fixture.getPredictionComment() : "N/A",
+                            data.getBetSuggestion().getJustification()));
                 } else {
                     System.out.println(String.format("⏭️ [PULANDO] %s x %s | ID: %d | Motivo: Já analisado",
                             fixture.getHomeTeam(), fixture.getAwayTeam(), fixture.getId()));
