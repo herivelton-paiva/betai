@@ -46,7 +46,7 @@ public class FixtureController {
 
     @GetMapping("/filter-upcoming")
     public String filterUpcomingFixtures() {
-        matchFilterService.filtrarOportunidadesProximasDuasHoras();
+        matchFilterService.filtrarOportunidadesProximasQuatroHoras();
         return "Processamento de filtro para as próximas 2 horas iniciado.";
     }
 
